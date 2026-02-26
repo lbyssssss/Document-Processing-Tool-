@@ -1,7 +1,8 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'https://8dd7da69f7ae.monkeycode-ai.online:443/api/v1'
+// 使用相对路径，由 vite 代理转发到后端
+const baseURL = '/api/v1'
 
 const apiClient: AxiosInstance = axios.create({
   baseURL,
