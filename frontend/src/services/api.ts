@@ -126,6 +126,12 @@ export const api = {
     return res.data
   },
 
+  // 获取文档页面
+  async getDocumentPages(documentId: string) {
+    const res = await apiClient.get(`/merge/documents/${documentId}/pages`)
+    return res.data
+  },
+
   // 拼接
   async selectPage(page: any) {
     const res = await apiClient.post('/merge/select-page', page)

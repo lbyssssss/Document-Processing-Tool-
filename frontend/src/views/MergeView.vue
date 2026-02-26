@@ -170,7 +170,6 @@ import { useMergeStore } from '@/stores/merge'
 import { api } from '@/services/api'
 import type { UploadFile } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import type { SelectedPage } from '@/stores/merge'
 
 const router = useRouter()
 const mergeStore = useMergeStore()
@@ -195,24 +194,24 @@ async function handleFileUpload() {
   try {
     const result = await api.uploadDocument(uploadingFile.value)
 
-    if (result.success) {
+    // API 返回 {document_id, filename, status}
+    if (result.status === 'uploaded') {
+      const documentId = result.document_id
+
+      // 获取文档页面列表
+      const pagesResult = await api.getDocumentPages(documentId)
+
       documents.value.push({
-        id: result.document_id,
+        id: documentId,
         name: result.filename,
-        pages: result.pages.map((p: any, index: number) => ({
-          ...p,
-          thumbnail: '',
-          width: p.width || 595.28,
-          height: p.height || 841.89,
-          rotation: p.rotation || 0,
-        })),
+        pages: pagesResult.pages || [],
       })
 
       if (documents.value.length === 1) {
-        activeDocumentId.value = result.document_id
+        activeDocumentId.value = documentId
       }
 
-      ElMessage.success(`文档上传成功，共 ${result.total_pages} 页`)
+      ElMessage.success(`文档上传成功，共 ${pagesResult.page_count || 0} 页`)
       showUploadDialog.value = false
     } else {
       ElMessage.error('文档上传失败')
@@ -247,7 +246,7 @@ async function togglePageSelection(docId: string, pageIndex: number) {
     await api.deselectPage(pageId)
     mergeStore.removePage(pageId)
   } else {
-    const selectedPage: SelectedPage = {
+    const selectedPage = {
       id: pageId,
       document_id: docId,
       page_index: pageIndex,
