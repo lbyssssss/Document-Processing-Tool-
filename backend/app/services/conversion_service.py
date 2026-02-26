@@ -4,6 +4,7 @@ from typing import Optional, List
 from datetime import datetime
 import uuid
 import os
+import logging
 
 from app.models.document import DocumentType
 from app.services.converters import (
@@ -76,16 +77,24 @@ class ConversionService:
     ) -> ConversionResult:
         """PDF转Word"""
         try:
+            logger.info(f"开始 PDF 到 Word 转换: {file.name}")
             output_path = self._get_output_path(file.name, "docx")
+            logger.info(f"输出路径: {output_path}")
+
             converter = PDFToWordConverter(file, output_path)
             result = converter.convert()
 
+            logger.info(f"转换器结果: {result}")
+
             if not result.get("success"):
+                logger.error(f"转换失败: {result.get('error')}")
                 return ConversionResult(
                     success=False,
                     output_format="docx",
                     error=result.get("error", "Unknown error"),
                 )
+
+            logger.info(f"转换成功，输出文件: {result.get('output_file')}")
 
             return ConversionResult(
                 success=True,
@@ -95,6 +104,7 @@ class ConversionService:
             )
 
         except Exception as e:
+            logger.error(f"PDF 到 Word 转换异常: {e}")
             return ConversionResult(
                 success=False,
                 output_format="docx",
