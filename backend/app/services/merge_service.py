@@ -81,8 +81,6 @@ class MergeService:
         doc_id = selected_page.document_id
         if doc_id not in self._documents:
             # 先从上传目录查找文档
-            import glob
-            import os
             upload_path = Path(settings.upload_dir)
             existing_files = list(upload_path.glob(f"{doc_id}.pdf"))
             if existing_files:
@@ -92,32 +90,8 @@ class MergeService:
                     "name": selected_page.original_document_name,
                     "path": str(doc_path),
                 }
-            else:
-                return {"status": "error", "error": f"文档 {doc_id} 不存在"}
 
         return {"status": "selected", "queue_size": len(self._queue)}
-        # 先检查文档是否在队列中（优先从队列获取文档信息）
-        for page in self._queue:
-            if page.document_id == document_id:
-                # 从上传目录查找文档
-                import glob
-                upload_path = Path(settings.upload_dir)
-                existing_files = list(upload_path.glob(f"{document_id}.pdf"))
-                if existing_files:
-                    doc_path = existing_files[0]
-                    return self._get_pdf_pages_info(str(doc_path), page.original_document_name, document_id)
-
-        # 如果队列中没有找到，尝试从 _documents 获取
-        doc_info = self._documents.get(document_id)
-        if doc_info:
-            pdf_path = doc_info.get("path")
-            if pdf_path and Path(pdf_path).exists():
-                return self._get_pdf_pages_info(str(pdf_path), doc_info.get("name"), document_id)
-
-        return {
-            "success": False,
-            "error": f"文档 {document_id} 不存在",
-        }
 
     def deselect_page(self, page_id: str) -> dict:
         """取消选择页面"""
@@ -327,19 +301,15 @@ class MergeService:
             )
 
         try:
-            # 按文档ID分组
-            doc_pages = {}
-            for page in self._queue:
-                if page.document_id not in doc_pages:
-                    doc_pages[page.document_id] = []
-                doc_pages[page.document_id].append((page.document_id, page.page_index))
-
             # 收集所有PDF文件路径
             pdf_files = []
-            for doc_id, pages in doc_pages.items():
-                doc_info = self._documents.get(doc_id)
-                if doc_info and Path(doc_info["path"]).exists():
-                    pdf_files.append(Path(doc_info["path"]))
+            doc_id_to_index = {}  # document_id -> index in pdf_files list
+            for page in self._queue:
+                if page.document_id not in doc_id_to_index:
+                    doc_info = self._documents.get(page.document_id)
+                    if doc_info and Path(doc_info["path"]).exists():
+                        pdf_files.append(Path(doc_info["path"]))
+                        doc_id_to_index[page.document_id] = len(pdf_files) - 1
 
             if not pdf_files:
                 return MergeResult(
@@ -348,10 +318,17 @@ class MergeService:
                     error="没有有效的PDF文件",
                 )
 
-            # 按队列顺序排序页面
+            # 按队列顺序排序页面（使用文档索引而不是文档ID）
             sorted_pages = []
             for page in self._queue:
-                sorted_pages.append((page.document_id, page.page_index))
+                doc_index = doc_id_to_index.get(page.document_id)
+                if doc_index is not None:
+                    return MergeResult(
+                        success=False,
+                        total_pages=0,
+                        error=f"文档 {page.document_id} 未找到",
+                    )
+                sorted_pages.append((doc_index, page.page_index))
 
             # 生成输出文件路径
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -422,3 +399,49 @@ class MergeService:
             "success": False,
             "error": f"文档 {document_id} 不存在",
         }
+
+    def _get_pdf_pages_info(self, pdf_path: str, document_name: str, document_id: str) -> dict:
+        """获取PDF文档的页面信息"""
+        try:
+            from PyPDF2 import PdfReader
+            import base64
+            from io import BytesIO
+
+            pdf_file = Path(pdf_path)
+            reader = PdfReader(str(pdf_file))
+
+            converter = DocumentMergeConverter(Path(settings.thumbnail_dir))
+            thumbnails_result = converter.extract_page_thumbnails(
+                pdf_file,
+                size=(150, 210),
+            )
+
+            if not thumbnails_result.get("success"):
+                return {
+                    "success": False,
+                    "error": thumbnails_result.get("error"),
+                }
+
+            pages = []
+            for i, page in enumerate(reader.pages):
+                page_info = {
+                    "index": i,
+                    "width": thumbnails_result["thumbnails"][i]["width"],
+                    "height": thumbnails_result["thumbnails"][i]["height"],
+                    "thumbnail": thumbnails_result["thumbnails"][i]["thumbnail"],
+                }
+                pages.append(page_info)
+
+            return {
+                "success": True,
+                "document_id": document_id,
+                "document_name": document_name,
+                "page_count": len(pages),
+                "pages": pages,
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+            }

@@ -136,6 +136,8 @@ class DocumentMergeConverter:
         目前返回占位数据
         """
         try:
+            import base64
+
             # 获取页面尺寸
             page_width = float(page.mediabox.width)
             page_height = float(page.mediabox.height)
@@ -150,8 +152,13 @@ class DocumentMergeConverter:
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
 
+            # 转换为 base64 字符串
+            img_bytes = img_byte_arr.getvalue()
+            img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+            img_data_uri = f"data:image/png;base64,{img_base64}"
+
             return {
-                "data": img_byte_arr.getvalue(),
+                "data": img_data_uri,
                 "width": width,
                 "height": height,
                 "original_width": int(page_width),

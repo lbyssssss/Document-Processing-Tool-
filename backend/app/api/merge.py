@@ -97,6 +97,13 @@ async def upload_document(file: UploadFile = File(...)):
     with open(target_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
+    # 将文档信息添加到 merge_service 中
+    merge_service._documents[doc_id] = {
+        "id": doc_id,
+        "name": file.filename,
+        "path": str(target_path),
+    }
+
     return {
         "document_id": doc_id,
         "filename": file.filename,
@@ -197,4 +204,9 @@ async def get_document_pages(document_id: str):
     if result.get("success"):
         return result
     else:
-        raise HTTPException(status_code=500, detail=result.get("error", "Unknown error"))
+        error_msg = result.get("error", "Unknown error")
+        # 如果是"文档不存在"的错误，返回404；其他错误返回500
+        if "不存在" in error_msg:
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=500, detail=error_msg)
