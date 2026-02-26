@@ -48,7 +48,7 @@ class ConversionResult:
         success: bool,
         output_path: Optional[str] = None,
         output_format: str = "",
-        warnings: List[str] | None = None,
+        warnings: Optional[List[str]] = None,
         error: Optional[str] = None,
     ):
         self.success = success

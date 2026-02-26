@@ -55,7 +55,7 @@ class MergeResult:
         success: bool,
         output_path: Optional[str] = None,
         total_pages: int = 0,
-        warnings: List[str] | None = None,
+        warnings: Optional[List[str]] = None,
         error: Optional[str] = None,
     ):
         self.success = success
