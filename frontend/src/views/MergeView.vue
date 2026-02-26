@@ -55,12 +55,26 @@
                       @click="togglePageSelection(doc.id, index)"
                     >
                       <div class="page-thumbnail">
-                        <el-icon :size="40"><Document /></el-icon>
+                        <img
+                          v-if="page.thumbnail"
+                          :src="page.thumbnail"
+                          alt="页面缩略图"
+                          class="page-thumbnail-img"
+                        />
+                        <el-icon v-else :size="40"><Document /></el-icon>
                       </div>
                       <span class="page-number">{{ index + 1 }}</span>
                       <el-icon v-if="isPageSelected(doc.id, index)" class="check-icon">
                         <CircleCheckFilled />
                       </el-icon>
+                      <el-button
+                        size="small"
+                        circle
+                        class="preview-btn"
+                        @click.stop="showPagePreview(doc, index)"
+                      >
+                        <el-icon><ZoomIn /></el-icon>
+                      </el-button>
                     </div>
                   </div>
                 </el-tab-pane>
@@ -195,6 +209,7 @@ import {
   UploadFilled,
   Document,
   Close,
+  ZoomIn,
 } from '@element-plus/icons-vue'
 import { useMergeStore } from '@/stores/merge'
 import { api } from '@/services/api'
@@ -351,6 +366,15 @@ function removeDocument(docId: string) {
   }
 }
 
+function showPagePreview(doc: any, pageIndex: number) {
+  previewPage.value = {
+    original_document_name: doc.name,
+    page_index: pageIndex,
+    thumbnail: doc.pages[pageIndex]?.thumbnail || '',
+  }
+  showPreviewDialog.value = true
+}
+
 function showPreview(page: any) {
   previewPage.value = page
   showPreviewDialog.value = true
@@ -454,6 +478,12 @@ async function handleMerge() {
   color: #999;
 }
 
+.page-thumbnail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .page-number {
   position: absolute;
   bottom: 4px;
@@ -473,6 +503,18 @@ async function handleMerge() {
   color: #409eff;
   background: white;
   border-radius: 50%;
+}
+
+.preview-btn {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.page-item:hover .preview-btn {
+  opacity: 1;
 }
 
 .queue-list {
