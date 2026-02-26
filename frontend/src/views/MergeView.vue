@@ -14,20 +14,38 @@
           <el-col :span="16">
             <el-card class="document-list-card">
               <template #header>
-                <span>上传文档</span>
-                <el-button size="small" type="primary" @click="showUploadDialog = true">
-                  <el-icon><Plus /></el-icon>
-                  添加文档
-                </el-button>
+                <div class="card-header">
+                  <span>文档列表 ({{ documents.length }})</span>
+                  <el-button size="small" type="primary" @click="showUploadDialog = true">
+                    <el-icon><Plus /></el-icon>
+                    添加文档
+                  </el-button>
+                </div>
               </template>
 
-              <el-tabs v-model="activeDocumentId">
+              <el-empty v-if="documents.length === 0" description="暂无文档，请点击右上角上传" />
+
+              <el-tabs v-else v-model="activeDocumentId">
                 <el-tab-pane
                   v-for="doc in documents"
                   :key="doc.id"
                   :label="doc.name"
                   :name="doc.id"
                 >
+                  <template #label>
+                    <span class="tab-label">
+                      {{ doc.name }}
+                      <el-button
+                        size="small"
+                        text
+                        type="danger"
+                        @click.stop="removeDocument(doc.id)"
+                      >
+                        <el-icon><Close /></el-icon>
+                      </el-button>
+                    </span>
+                  </template>
+
                   <div class="page-grid">
                     <div
                       v-for="(page, index) in doc.pages"
@@ -36,7 +54,9 @@
                       :class="{ selected: isPageSelected(doc.id, index) }"
                       @click="togglePageSelection(doc.id, index)"
                     >
-                      <img :src="page.thumbnail" :alt="`第${index + 1}页`" />
+                      <div class="page-thumbnail">
+                        <el-icon :size="40"><Document /></el-icon>
+                      </div>
                       <span class="page-number">{{ index + 1 }}</span>
                       <el-icon v-if="isPageSelected(doc.id, index)" class="check-icon">
                         <CircleCheckFilled />
@@ -45,8 +65,6 @@
                   </div>
                 </el-tab-pane>
               </el-tabs>
-
-              <el-empty v-if="documents.length === 0" description="暂无文档，请先上传" />
             </el-card>
           </el-col>
 
@@ -54,8 +72,10 @@
           <el-col :span="8">
             <el-card class="merge-queue-card">
               <template #header>
-                <span>拼接队列</span>
-                <el-tag type="info">{{ queue.length }} 页</el-tag>
+                <div class="card-header">
+                  <span>拼接队列</span>
+                  <el-tag type="info">{{ queue.length }} 页</el-tag>
+                </div>
               </template>
 
               <div class="queue-list">
@@ -64,9 +84,12 @@
                   :key="page.id"
                   class="queue-item"
                 >
-                  <img :src="page.thumbnail" :alt="`第${index + 1}页`" />
+                  <div class="queue-item-thumb">
+                    <el-icon :size="24"><Document /></el-icon>
+                  </div>
                   <div class="queue-item-info">
-                    <span>{{ page.original_document_name }} - 第{{ page.page_index + 1 }}页</span>
+                    <div class="queue-item-name">{{ page.original_document_name }}</div>
+                    <div class="queue-item-page">第 {{ page.page_index + 1 }} 页</div>
                   </div>
                   <el-button
                     size="small"
@@ -99,15 +122,54 @@
         </el-row>
       </el-main>
     </el-container>
+
+    <!-- 上传对话框 -->
+    <el-dialog v-model="showUploadDialog" title="上传文档" width="500px">
+      <el-upload
+        drag
+        :auto-upload="false"
+        :on-change="handleUploadChange"
+        :limit="1"
+        accept=".pdf"
+      >
+        <el-icon :size="60"><UploadFilled /></el-icon>
+        <div class="el-upload__text">
+          将 PDF 文件拖到此处，或<em>点击上传</em>
+        </div>
+        <template #tip>
+          <div class="el-upload__tip">
+            支持 PDF 格式，最大 100MB
+          </div>
+        </template>
+      </el-upload>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showUploadDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleFileUpload" :loading="uploading">
+            上传
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Plus, Delete, CircleCheckFilled } from '@element-plus/icons-vue'
+import {
+  ArrowLeft,
+  Plus,
+  Delete,
+  CircleCheckFilled,
+  UploadFilled,
+  Document,
+  Close,
+} from '@element-plus/icons-vue'
 import { useMergeStore } from '@/stores/merge'
 import { api } from '@/services/api'
+import type { UploadFile } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import type { SelectedPage } from '@/stores/merge'
 
 const router = useRouter()
@@ -117,9 +179,57 @@ const queue = computed(() => mergeStore.queue)
 const activeDocumentId = ref('')
 const showUploadDialog = ref(false)
 const merging = ref(false)
+const uploading = ref(false)
 
-// 模拟文档数据
 const documents = ref<any[]>([])
+const uploadingFile = ref<File | null>(null)
+
+async function handleFileUpload() {
+  if (!uploadingFile.value) {
+    ElMessage.warning('请选择文件')
+    return
+  }
+
+  uploading.value = true
+
+  try {
+    const result = await api.uploadDocument(uploadingFile.value)
+
+    if (result.success) {
+      documents.value.push({
+        id: result.document_id,
+        name: result.filename,
+        pages: result.pages.map((p: any, index: number) => ({
+          ...p,
+          thumbnail: '',
+          width: p.width || 595.28,
+          height: p.height || 841.89,
+          rotation: p.rotation || 0,
+        })),
+      })
+
+      if (documents.value.length === 1) {
+        activeDocumentId.value = result.document_id
+      }
+
+      ElMessage.success(`文档上传成功，共 ${result.total_pages} 页`)
+      showUploadDialog.value = false
+    } else {
+      ElMessage.error('文档上传失败')
+    }
+  } catch (error: any) {
+    ElMessage.error(`上传失败：${error.message}`)
+  } finally {
+    uploading.value = false
+    uploadingFile.value = null
+  }
+}
+
+function handleUploadChange(file: UploadFile) {
+  if (file.raw) {
+    uploadingFile.value = file.raw
+  }
+}
 
 function isPageSelected(docId: string, pageIndex: number): boolean {
   return queue.value.some(
@@ -142,10 +252,10 @@ async function togglePageSelection(docId: string, pageIndex: number) {
       document_id: docId,
       page_index: pageIndex,
       original_document_name: doc.name,
-      thumbnail: doc.pages[pageIndex].thumbnail,
-      page_width: doc.pages[pageIndex].width,
-      page_height: doc.pages[pageIndex].height,
-      rotation: doc.pages[pageIndex].rotation,
+      thumbnail: doc.pages[pageIndex].thumbnail || '',
+      page_width: doc.pages[pageIndex].width || 595.28,
+      page_height: doc.pages[pageIndex].height || 841.89,
+      rotation: doc.pages[pageIndex].rotation || 0,
     }
     await api.selectPage(selectedPage)
     mergeStore.addPage(selectedPage)
@@ -161,18 +271,34 @@ function clearQueue() {
   mergeStore.clearQueue()
 }
 
+function removeDocument(docId: string) {
+  documents.value = documents.value.filter(d => d.id !== docId)
+
+  queue.value.forEach((page: any) => {
+    if (page.document_id === docId) {
+      removeFromQueue(page.id)
+    }
+  })
+
+  if (activeDocumentId.value === docId && documents.value.length > 0) {
+    activeDocumentId.value = documents.value[0].id
+  } else if (documents.value.length === 0) {
+    activeDocumentId.value = ''
+  }
+}
+
 async function handleMerge() {
   merging.value = true
   try {
     const config = mergeStore.config
     const result = await api.mergeDocuments(config)
     if (result.success) {
-      alert('合并成功！')
+      ElMessage.success(`合并成功！共 ${result.total_pages} 页`)
     } else {
-      alert(`合并失败: ${result.error}`)
+      ElMessage.error(`合并失败：${result.error}`)
     }
   } catch (error: any) {
-    alert(`合并失败: ${error.message}`)
+    ElMessage.error(`合并失败：${error.message}`)
   } finally {
     merging.value = false
   }
@@ -195,17 +321,30 @@ async function handleMerge() {
   padding: 24px;
 }
 
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.tab-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .page-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
   padding: 16px 0;
 }
 
 .page-item {
   position: relative;
   border: 2px solid #eee;
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
   transition: all 0.2s;
@@ -221,10 +360,13 @@ async function handleMerge() {
   background-color: #ecf5ff;
 }
 
-.page-item img {
-  width: 100%;
+.page-thumbnail {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   height: 100%;
-  object-fit: contain;
+  background-color: #f5f5f5;
+  color: #999;
 }
 
 .page-number {
@@ -236,7 +378,7 @@ async function handleMerge() {
   color: white;
   padding: 2px 8px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .check-icon {
@@ -249,7 +391,7 @@ async function handleMerge() {
 }
 
 .queue-list {
-  max-height: 400px;
+  max-height: 450px;
   overflow-y: auto;
 }
 
@@ -257,20 +399,34 @@ async function handleMerge() {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px;
+  padding: 10px;
   border-bottom: 1px solid #eee;
 }
 
-.queue-item img {
-  width: 48px;
-  height: 68px;
-  object-fit: contain;
-  border: 1px solid #eee;
+.queue-item-thumb {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 40px;
+  height: 56px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  color: #999;
 }
 
 .queue-item-info {
   flex: 1;
+}
+
+.queue-item-name {
   font-size: 14px;
+  font-weight: 500;
+}
+
+.queue-item-page {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
 }
 
 .queue-actions {
