@@ -301,6 +301,25 @@ class MergeService:
             )
 
         try:
+            # 先确保所有队列中的文档都在 _documents 中
+            for page in self._queue:
+                if page.document_id not in self._documents:
+                    # 尝试从上传目录查找文档
+                    upload_path = Path(settings.upload_dir)
+                    existing_files = list(upload_path.glob(f"{page.document_id}.pdf"))
+                    if existing_files:
+                        self._documents[page.document_id] = {
+                            "id": page.document_id,
+                            "name": page.original_document_name,
+                            "path": str(existing_files[0]),
+                        }
+                    else:
+                        return MergeResult(
+                            success=False,
+                            total_pages=0,
+                            error=f"文档 {page.document_id} 的文件不存在",
+                        )
+
             # 收集所有PDF文件路径
             pdf_files = []
             doc_id_to_index = {}  # document_id -> index in pdf_files list
@@ -322,12 +341,32 @@ class MergeService:
             sorted_pages = []
             for page in self._queue:
                 doc_index = doc_id_to_index.get(page.document_id)
-                if doc_index is not None:
-                    return MergeResult(
-                        success=False,
-                        total_pages=0,
-                        error=f"文档 {page.document_id} 未找到",
-                    )
+                if doc_index is None:
+                    # 如果映射中没有找到，尝试从上传目录查找
+                    doc_info = self._documents.get(page.document_id)
+                    if doc_info and Path(doc_info["path"]).exists():
+                        pdf_files.append(Path(doc_info["path"]))
+                        doc_id_to_index[page.document_id] = len(pdf_files) - 1
+                        doc_index = doc_id_to_index[page.document_id]
+                    else:
+                        # 尝试直接从上传目录查找
+                        upload_path = Path(settings.upload_dir)
+                        existing_files = list(upload_path.glob(f"{page.document_id}.pdf"))
+                        if existing_files:
+                            self._documents[page.document_id] = {
+                                "id": page.document_id,
+                                "name": page.original_document_name,
+                                "path": str(existing_files[0]),
+                            }
+                            pdf_files.append(Path(existing_files[0]))
+                            doc_id_to_index[page.document_id] = len(pdf_files) - 1
+                            doc_index = doc_id_to_index[page.document_id]
+                        else:
+                            return MergeResult(
+                                success=False,
+                                total_pages=0,
+                                error=f"文档 {page.document_id} 的文件不存在",
+                            )
                 sorted_pages.append((doc_index, page.page_index))
 
             # 生成输出文件路径

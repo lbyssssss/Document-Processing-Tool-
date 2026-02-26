@@ -182,10 +182,16 @@ async def get_queue():
 @router.post("/merge/execute", response_model=MergeResultPydantic)
 async def merge_documents(config: MergeConfigPydantic):
     """生成合并后的PDF"""
-    service_config = _to_service_config(config)
-    result = await merge_service.merge_documents(service_config)
-
-    return _to_pydantic_result(result)
+    try:
+        service_config = _to_service_config(config)
+        result = await merge_service.merge_documents(service_config)
+        return _to_pydantic_result(result)
+    except TypeError as e:
+        import traceback
+        traceback.print_exc()
+        return _to_pydantic_result(
+            MergeServiceMergeResult(success=False, total_pages=0, error=str(e))
+        )
 
 
 @router.get("/merge/preview")
