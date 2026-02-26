@@ -133,26 +133,28 @@
 
     <!-- 上传对话框 -->
     <el-dialog v-model="showUploadDialog" title="上传文档" width="600px">
-      <el-upload
-        drag
-        :auto-upload="false"
-        :file-list="fileList"
-        :on-change="handleUploadChange"
-        :on-remove="handleUploadRemove"
-        :limit="10"
+      <input
+        ref="fileInputRef"
+        type="file"
         accept=".pdf"
         multiple
-      >
+        style="display: none"
+        @change="handleFileInputChange"
+      />
+      <div class="upload-area" @click="fileInputRef?.click()">
         <el-icon :size="60"><UploadFilled /></el-icon>
         <div class="el-upload__text">
           支持批量上传 PDF 文件，最多 10 个
         </div>
-        <template #tip>
-          <div class="el-upload__tip">
-            支持 PDF 格式，单个文件最大 100MB
-          </div>
-        </template>
-      </el-upload>
+      </div>
+      <div v-if="selectedFiles.length > 0" class="selected-files">
+        <div v-for="(file, index) in selectedFiles" :key="index" class="selected-file-item">
+          <span>{{ file.name }}</span>
+          <el-button size="small" text type="danger" @click.stop="removeSelectedFile(index)">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </div>
+      </div>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="showUploadDialog = false">取消</el-button>
@@ -210,10 +212,13 @@ const uploading = ref(false)
 const documents = ref<any[]>([])
 const showPreviewDialog = ref(false)
 const previewPage = ref<any>(null)
-const fileList = ref<any[]>([])
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const selectedFiles = ref<File[]>([])
 
 async function handleFileUpload() {
-  if (fileList.value.length === 0) {
+  console.log('handleFileUpload 调用, selectedFiles:', selectedFiles.value)
+  console.log('selectedFiles length:', selectedFiles.value.length)
+  if (selectedFiles.value.length === 0) {
     ElMessage.warning('请选择文件')
     return
   }
@@ -221,13 +226,11 @@ async function handleFileUpload() {
   uploading.value = true
 
   try {
-    // 从 fileList 中提取 File 对象
-    const filesToUpload = fileList.value
-      .map(item => item.raw as File)
-      .filter(Boolean)
+    console.log('准备上传的文件:', selectedFiles.value.length, '个')
 
     // 批量上传所有文件
-    const uploadPromises = filesToUpload.map(async (file) => {
+    const uploadPromises = selectedFiles.value.map(async (file) => {
+      console.log('上传文件:', file.name, file.size)
       const result = await api.uploadDocument(file)
 
       // 获取文档页面列表
@@ -267,7 +270,7 @@ async function handleFileUpload() {
       ElMessage.success(`成功上传 ${successCount} 个文档`)
       showUploadDialog.value = false
       // 清空上传文件列表
-      fileList.value = []
+      selectedFiles.value = []
     } else {
       ElMessage.error('文档上传失败')
     }
@@ -275,17 +278,21 @@ async function handleFileUpload() {
     ElMessage.error(`上传失败：${error.message}`)
   } finally {
     uploading.value = false
-    fileList.value = []
+    selectedFiles.value = []
   }
 }
 
-function handleUploadChange(file: any, uploadFiles: any[]) {
-  // el-upload 会自动更新 fileList，我们不需要手动操作
-  // 只在关闭对话框时清空
+function handleFileInputChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  if (target.files) {
+    const files = Array.from(target.files)
+    console.log('handleFileInputChange 选择文件:', files.length, '个')
+    selectedFiles.value = files
+  }
 }
 
-function handleUploadRemove(file: any, uploadFiles: any[]) {
-  // el-upload 会自动更新 fileList
+function removeSelectedFile(index: number) {
+  selectedFiles.value.splice(index, 1)
 }
 
 function isPageSelected(docId: string, pageIndex: number): boolean {
@@ -534,5 +541,35 @@ async function handleMerge() {
   max-height: 600px;
   border: 1px solid #eee;
   border-radius: 4px;
+}
+
+.upload-area {
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.upload-area:hover {
+  border-color: #409eff;
+  background-color: #f5f7fa;
+}
+
+.selected-files {
+  margin-top: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.selected-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  margin-bottom: 8px;
 }
 </style>
