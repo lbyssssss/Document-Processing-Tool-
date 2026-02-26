@@ -85,7 +85,7 @@ class DocumentMergeConverter:
         self,
         pdf_path: Path,
         pages: Optional[List[int]] = None,
-        size: tuple[int, int] = (200, 280),
+        size: tuple[int, int] = (300, 420),
     ) -> dict:
         """从PDF中提取页面缩略图
 
@@ -101,13 +101,14 @@ class DocumentMergeConverter:
             # 确定要处理的页码
             page_numbers = list(range(len(reader.pages))) if pages is None else pages
 
-            # 使用 pdf2image 将 PDF 转换为图片
+            # 使用 pdf2image 将 PDF 转换为图片，使用更高的 DPI 获得更清晰的图片
             try:
                 images = convert_from_bytes(
                     pdf_path.read_bytes(),
                     first_page=page_numbers[0] + 1 if page_numbers else 1,
                     last_page=(page_numbers[-1] + 1) if page_numbers else len(reader.pages),
-                    dpi=150,
+                    dpi=300,  # 提高 DPI 从 150 到 300
+                    thread_count=2,  # 使用多线程加速
                 )
             except Exception as e:
                 # 如果 pdf2image 失败，返回基本信息
@@ -136,12 +137,13 @@ class DocumentMergeConverter:
 
                 img = images[i]
 
-                # 缩放到指定尺寸
-                img.thumbnail(size, Image.Resampling.LANCZOS)
+                # 使用更高质量的重采样方法缩放图片
+                img_copy = img.copy()
+                img_copy.thumbnail(size, Image.Resampling.LANCZOS)
 
-                # 转换为 base64
+                # 转换为 base64，移除 optimize 参数以保持更高质量
                 buffer = io.BytesIO()
-                img.save(buffer, format='PNG', optimize=True)
+                img_copy.save(buffer, format='PNG', quality=95)
                 img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
                 img_data = f"data:image/png;base64,{img_str}"
 
