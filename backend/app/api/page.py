@@ -9,7 +9,7 @@ import logging
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1/page", tags=["page"])
+router = APIRouter(tags=["page"])
 
 
 class Page(BaseModel):
