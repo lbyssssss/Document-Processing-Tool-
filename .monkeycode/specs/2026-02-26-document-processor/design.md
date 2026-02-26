@@ -5,7 +5,7 @@ Updated: 2026-02-26
 
 ## Description
 
-文档处理工具是一个纯前端应用，支持PDF、Word、Excel、PPT、图片等常见格式的文档转换、检索、批注和页面管理，并提供文档拼接功能。采用本地部署方式，适用于个人和小团队场景，无需后端服务器支持。
+文档处理工具是一个基于Python的Web应用，支持PDF、Word、Excel、PPT、图片等常见格式的文档转换、检索、批注和页面管理，并提供文档拼接功能。采用本地部署方式，适用于个人和小团队场景。
 
 ## Architecture
 
@@ -13,7 +13,7 @@ Updated: 2026-02-26
 
 ```mermaid
 graph TB
-    subgraph "Presentation Layer"
+    subgraph "Frontend Layer"
         A1[文档列表视图]
         A2[文档预览视图]
         A3[转换向导视图]
@@ -23,30 +23,39 @@ graph TB
         A7[文档拼接视图]
     end
 
+    subgraph "API Layer"
+        B1[文档转换API]
+        B2[全文检索API]
+        B3[批注管理API]
+        B4[页面管理API]
+        B5[批量处理API]
+        B6[文档拼接API]
+    end
+
     subgraph "Application Layer"
-        B1[文档转换服务]
-        B2[全文检索服务]
-        B3[批注管理服务]
-        B4[页面管理服务]
-        B5[批量处理服务]
-        B6[文档拼接服务]
+        C1[文档转换服务]
+        C2[全文检索服务]
+        C3[批注管理服务]
+        C4[页面管理服务]
+        C5[批量处理服务]
+        C6[文档拼接服务]
     end
 
     subgraph "Domain Layer"
-        C1[文档模型]
-        C2[批注模型]
-        C3[页面模型]
-        C4[转换配置模型]
-        C5[拼接配置模型]
+        D1[文档模型]
+        D2[批注模型]
+        D3[页面模型]
+        D4[转换配置模型]
+        D5[拼接配置模型]
     end
 
     subgraph "Infrastructure Layer"
-        D1[PDF解析/生成器]
-        D2[Office文档解析/生成器]
-        D3[图片处理库]
-        D4[索引引擎]
-        D5[状态管理]
-        D6[本地存储]
+        E1[PyPDF2/pdfplumber]
+        E2[python-docx/openpyxl]
+        E3[Pillow]
+        E4[Whoosh]
+        E5[SQLite/JSON]
+        E6[FastAPI]
     end
 
     A1 --> B1
@@ -58,444 +67,507 @@ graph TB
     A7 --> B6
 
     B1 --> C1
-    B1 --> C4
-    B2 --> C1
-    B3 --> C2
-    B4 --> C3
-    B5 --> C1
-    B6 --> C5
+    B2 --> C2
+    B3 --> C3
+    B4 --> C4
+    B5 --> C5
+    B6 --> C6
 
-    B1 --> D1
-    B1 --> D2
-    B1 --> D3
-    B2 --> D4
-    B3 --> D5
-    B3 --> D6
-    B4 --> D1
-    B6 --> D1
+    C1 --> D1
+    C1 --> D4
+    C2 --> D1
+    C3 --> D2
+    C4 --> D3
+    C5 --> D1
+    C6 --> D5
+
+    C1 --> E1
+    C1 --> E2
+    C1 --> E3
+    C2 --> E4
+    C3 --> E5
+    C4 --> E1
+    C6 --> E1
+
+    C1 --> E6
+    C2 --> E6
+    C3 --> E6
+    C4 --> E6
+    C5 --> E6
+    C6 --> E6
 ```
 
 ### 技术栈选择
 
 | 层级 | 技术选择 | 说明 |
 |------|---------|------|
+| 后端框架 | FastAPI | 高性能异步Web框架 |
 | 前端框架 | Vue 3 + TypeScript | 响应式UI，类型安全 |
 | 构建工具 | Vite | 快速开发体验 |
 | UI组件库 | Element Plus | 企业级组件支持 |
 | 状态管理 | Pinia | 轻量级状态管理 |
-| PDF处理 | pdf.js, pdf-lib | PDF解析和生成 |
-| Office处理 | sheetjs, pptxgenjs | Excel/PPT处理 |
-| Word处理 | mammoth | Word解析 |
-| 图片处理 | html2canvas, sharp | 图片转换和处理 |
-| 全文检索 | flexsearch | 高性能全文搜索 |
-| 文件处理 | file-saver | 文件下载 |
+| PDF处理 | PyPDF2, pdfplumber, reportlab | PDF解析、生成和操作 |
+| Word处理 | python-docx, docx2pdf | Word文档读写和转换 |
+| Excel处理 | openpyxl, pandas | Excel文档处理 |
+| PPT处理 | python-pptx | PowerPoint文档处理 |
+| 图片处理 | Pillow | 图片处理和转换 |
+| 全文检索 | Whoosh | 高性能全文搜索 |
+| 数据存储 | SQLite | 轻量级数据库 |
+| 文件处理 | aiofiles | 异步文件操作 |
 
 ### 目录结构
 
 ```
-src/
-├── assets/                 # 静态资源
-├── components/             # Vue组件
-│   ├── document/          # 文档相关组件
-│   │   ├── DocumentList.vue
-│   │   ├── DocumentPreview.vue
-│   │   ├── PageThumbnail.vue
-│   │   └── ConversionWizard.vue
-│   ├── search/            # 搜索相关组件
-│   │   ├── SearchPanel.vue
-│   │   └── SearchResult.vue
-│   ├── annotation/        # 批注相关组件
-│   │   ├── AnnotationPanel.vue
-│   │   ├── AnnotationMarker.vue
-│   │   └── AnnotationList.vue
-│   ├── page/              # 页面管理组件
-│   │   ├── PageManager.vue
-│   │   └── PageToolbar.vue
-│   ├── merge/             # 文档拼接组件
-│   │   ├── DocumentMergeView.vue
-│   │   ├── PageSelector.vue
-│   │   ├── MergeQueue.vue
-│   │   └── PageRangeSelector.vue
-│   └── common/            # 通用组件
-│       ├── LoadingSpinner.vue
-│       ├── ProgressBar.vue
-│       └── ErrorAlert.vue
-├── composables/           # 组合式函数
-│   ├── useDocument.ts
-│   ├── useSearch.ts
-│   ├── useAnnotation.ts
-│   ├── usePageManagement.ts
-│   └── useDocumentMerge.ts
-├── services/              # 服务层
-│   ├── conversion.service.ts
-│   ├── search.service.ts
-│   ├── annotation.service.ts
-│   ├── page.service.ts
-│   ├── batch.service.ts
-│   └── merge.service.ts
-├── stores/                # 状态管理
-│   ├── document.store.ts
-│   ├── annotation.store.ts
-│   ├── ui.store.ts
-│   └── merge.store.ts
-├── types/                 # 类型定义
-│   ├── document.types.ts
-│   ├── annotation.types.ts
-│   ├── conversion.types.ts
-│   └── merge.types.ts
-├── utils/                 # 工具函数
-│   ├── file.utils.ts
-│   ├── format.utils.ts
-│   └── validation.utils.ts
-└── App.vue
+document-processor/
+├── backend/                # Python后端
+│   ├── app/               # 应用主目录
+│   │   ├── api/          # API路由
+│   │   │   ├── __init__.py
+│   │   │   ├── conversion.py
+│   │   │   ├── search.py
+│   │   │   ├── annotation.py
+│   │   │   ├── page.py
+│   │   │   ├── batch.py
+│   │   │   └── merge.py
+│   │   ├── core/         # 核心配置
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py
+│   │   │   └── security.py
+│   │   ├── models/       # 数据模型
+│   │   │   ├── __init__.py
+│   │   │   ├── document.py
+│   │   │   ├── annotation.py
+│   │   │   └── page.py
+│   │   ├── schemas/      # Pydantic模式
+│   │   │   ├── __init__.py
+│   │   │   ├── conversion.py
+│   │   │   ├── search.py
+│   │   │   ├── annotation.py
+│   │   │   └── merge.py
+│   │   ├── services/     # 业务逻辑服务
+│   │   │   ├── __init__.py
+│   │   │   ├── conversion_service.py
+│   │   │   ├── search_service.py
+│   │   │   ├── annotation_service.py
+│   │   │   ├── page_service.py
+│   │   │   └── merge_service.py
+│   │   ├── utils/        # 工具函数
+│   │   │   ├── __init__.py
+│   │   │   ├── file_utils.py
+│   │   │   └── format_utils.py
+│   │   └── main.py      # FastAPI应用入口
+│   ├── storage/          # 文件存储
+│   │   ├── uploads/      # 上传文件
+│   │   ├── outputs/      # 输出文件
+│   │   ├── thumbnails/   # 缩略图
+│   │   └── db/          # 数据库文件
+│   ├── tests/            # 测试
+│   │   ├── __init__.py
+│   │   ├── test_conversion.py
+│   │   ├── test_search.py
+│   │   └── test_merge.py
+│   ├── requirements.txt   # Python依赖
+│   └── pyproject.toml    # 项目配置
+├── frontend/            # Vue前端
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── document/
+│   │   │   ├── search/
+│   │   │   ├── annotation/
+│   │   │   ├── page/
+│   │   │   ├── merge/
+│   │   │   └── common/
+│   │   ├── composables/
+│   │   ├── services/
+│   │   ├── stores/
+│   │   ├── types/
+│   │   └── utils/
+│   ├── package.json
+│   └── vite.config.ts
+└── README.md
 ```
 
 ## Components and Interfaces
 
 ### 文档转换服务 (ConversionService)
 
-```typescript
-interface ConversionOptions {
-  preserveFormatting: boolean;    // 保持格式
-  quality?: number;              // 输出质量
-  password?: string;             // 文档密码
-  includeAnnotations?: boolean;   // 包含批注
-}
+```python
+from typing import Optional, List
+from pydantic import BaseModel
+from pathlib import Path
 
-interface ConversionResult {
-  success: boolean;
-  outputBlob: Blob | null;
-  outputFormat: string;
-  warnings: string[];
-  error?: string;
-}
 
-interface ConversionService {
-  // PDF转Word
-  pdfToWord(file: File, options: ConversionOptions): Promise<ConversionResult>;
+class ConversionOptions(BaseModel):
+    preserve_formatting: bool = True
+    quality: Optional[int] = 90
+    password: Optional[str] = None
+    include_annotations: bool = False
 
-  // Word转PDF
-  wordToPdf(file: File, options: ConversionOptions): Promise<ConversionResult>;
 
-  // PDF转Excel
-  pdfToExcel(file: File, options: ConversionOptions): Promise<ConversionResult>;
+class ConversionResult(BaseModel):
+    success: bool
+    output_path: Optional[str] = None
+    output_format: str
+    warnings: List[str] = []
+    error: Optional[str] = None
 
-  // Excel转PDF
-  excelToPdf(file: File, options: ConversionOptions): Promise<ConversionResult>;
 
-  // PDF转PPT
-  pdfToPpt(file: File, options: ConversionOptions): Promise<ConversionResult>;
+class ConversionService:
+    async def pdf_to_word(
+        self, file: Path, options: ConversionOptions
+    ) -> ConversionResult:
+        """PDF转Word"""
+        pass
 
-  // PPT转PDF
-  pptToPdf(file: File, options: ConversionOptions): Promise<ConversionResult>;
+    async def word_to_pdf(
+        self, file: Path, options: ConversionOptions
+    ) -> ConversionResult:
+        """Word转PDF"""
+        pass
 
-  // 图片转PDF
-  imageToPdf(files: File[], options: ConversionOptions): Promise<ConversionResult>;
+    async def pdf_to_excel(
+        self, file: Path, options: ConversionOptions
+    ) -> ConversionResult:
+        """PDF转Excel"""
+        pass
 
-  // PDF转图片
-  pdfToImages(file: File, options: ConversionOptions): Promise<ConversionResult[]>;
-}
+    async def excel_to_pdf(
+        self, file: Path, options: ConversionOptions
+    ) -> ConversionResult:
+        """Excel转PDF"""
+        pass
+
+    async def pdf_to_ppt(
+        self, file: Path, options: ConversionOptions
+    ) -> ConversionResult:
+        """PDF转PPT"""
+        pass
+
+    async def ppt_to_pdf(
+        self, file: Path, options: ConversionOptions
+    ) -> ConversionResult:
+        """PPT转PDF"""
+        pass
+
+    async def images_to_pdf(
+        self, files: List[Path], options: ConversionOptions
+    ) -> ConversionResult:
+        """图片转PDF"""
+        pass
+
+    async def pdf_to_images(
+        self, file: Path, options: ConversionOptions
+    ) -> List[ConversionResult]:
+        """PDF转图片"""
+        pass
 ```
 
 ### 全文检索服务 (SearchService)
 
-```typescript
-interface SearchOptions {
-  caseSensitive: boolean;
-  wholeWord: boolean;
-  regex: boolean;
-}
+```python
+from typing import List, Optional
+from pydantic import BaseModel
 
-interface SearchResult {
-  pageIndex: number;
-  text: string;
-  position: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-}
 
-interface SearchService {
-  // 建立索引
-  buildIndex(documentId: string, content: string): void;
+class SearchOptions(BaseModel):
+    case_sensitive: bool = False
+    whole_word: bool = False
+    regex: bool = False
 
-  // 执行搜索
-  search(query: string, options: SearchOptions): SearchResult[];
 
-  // 高亮显示
-  highlight(results: SearchResult[]): void;
+class SearchResult(BaseModel):
+    page_index: int
+    text: str
+    position: dict  # {'x': float, 'y': float, 'width': float, 'height': float}
 
-  // 导航到结果
-  navigateTo(result: SearchResult): void;
-}
+
+class SearchService:
+    def __init__(self, index_dir: str):
+        """初始化搜索服务"""
+        pass
+
+    def build_index(self, document_id: str, content: str) -> None:
+        """建立索引"""
+        pass
+
+    def search(
+        self, query: str, options: SearchOptions
+    ) -> List[SearchResult]:
+        """执行搜索"""
+        pass
+
+    def highlight_results(self, results: List[SearchResult]) -> None:
+        """高亮显示结果"""
+        pass
 ```
 
 ### 批注管理服务 (AnnotationService)
 
-```typescript
-interface Annotation {
-  id: string;
-  documentId: string;
-  pageIndex: number;
-  position: Rectangle;
-  content: string;
-  author: string;
-  createdAt: Date;
-  updatedAt: Date;
-  color: string;
-}
+```python
+from typing import List, Optional
+from pydantic import BaseModel
+from datetime import datetime
+import uuid
 
-interface Rectangle {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
-interface AnnotationService {
-  // 添加批注
-  add(annotation: Omit<Annotation, 'id' | 'createdAt' | 'updatedAt'>): Annotation;
+class Rectangle(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
 
-  // 更新批注
-  update(id: string, updates: Partial<Annotation>): void;
 
-  // 删除批注
-  remove(id: string): void;
+class Annotation(BaseModel):
+    id: str
+    document_id: str
+    page_index: int
+    position: Rectangle
+    content: str
+    author: str
+    color: str
+    created_at: datetime
+    updated_at: datetime
 
-  // 获取文档批注列表
-  list(documentId: string): Annotation[];
 
-  // 保存到本地存储
-  saveToStorage(): void;
+class AnnotationService:
+    def add(self, annotation: Annotation) -> Annotation:
+        """添加批注"""
+        pass
 
-  // 从本地存储加载
-  loadFromStorage(): void;
-}
+    def update(self, id: str, updates: dict) -> None:
+        """更新批注"""
+        pass
+
+    def remove(self, id: str) -> None:
+        """删除批注"""
+        pass
+
+    def list(self, document_id: str) -> List[Annotation]:
+        """获取文档批注列表"""
+        pass
+
+    def save_to_storage(self) -> None:
+        """保存到本地存储"""
+        pass
+
+    def load_from_storage(self) -> None:
+        """从本地存储加载"""
+        pass
 ```
 
 ### 页面管理服务 (PageService)
 
-```typescript
-interface PageOperation {
-  type: 'insert' | 'delete' | 'move' | 'rotate' | 'merge' | 'split';
-  pageIndex: number;
-  targetIndex?: number;
-  rotation?: number;
-}
+```python
+from typing import Optional
 
-interface PageService {
-  // 插入页面
-  insert(index: number, page: PDFPage): void;
 
-  // 删除页面
-  delete(index: number): void;
+class PageService:
+    def insert(self, index: int, page_data: dict) -> None:
+        """插入页面"""
+        pass
 
-  // 移动页面
-  move(fromIndex: number, toIndex: number): void;
+    def delete(self, index: int) -> None:
+        """删除页面"""
+        pass
 
-  // 旋转页面
-  rotate(index: number, degrees: 90 | 180 | 270): void;
+    def move(self, from_index: int, to_index: int) -> None:
+        """移动页面"""
+        pass
 
-  // 合并页面
-  merge(indices: number[]): void;
+    def rotate(self, index: int, degrees: int) -> None:
+        """旋转页面"""
+        pass
 
-  // 拆分页面
-  split(index: number): void;
+    def merge(self, indices: List[int]) -> None:
+        """合并页面"""
+        pass
 
-  // 获取页面缩略图
-  getThumbnail(index: number): Promise<string>;
-}
+    def split(self, index: int) -> None:
+        """拆分页面"""
+        pass
+
+    async def get_thumbnail(self, index: int) -> Optional[str]:
+        """获取页面缩略图"""
+        pass
 ```
 
 ### 文档拼接服务 (MergeService)
 
-```typescript
-interface SelectedPage {
-  id: string;
-  documentId: string;
-  pageIndex: number;
-  originalDocumentName: string;
-  thumbnail: string;
-  pageWidth: number;
-  pageHeight: number;
-  rotation: number;
-}
+```python
+from typing import List
+from pydantic import BaseModel
 
-interface MergeConfig {
-  pageSize?: 'A4' | 'A3' | 'Letter' | 'auto';
-  orientation?: 'portrait' | 'landscape' | 'keep-original';
-  outputFileName: string;
-  includeBookmarks?: boolean;
-  metadata?: {
-    title?: string;
-    author?: string;
-    subject?: string;
-  };
-}
 
-interface MergeResult {
-  success: boolean;
-  outputBlob: Blob | null;
-  totalPages: number;
-  warnings: string[];
-  error?: string;
-}
+class SelectedPage(BaseModel):
+    id: str
+    document_id: str
+    page_index: int
+    original_document_name: str
+    thumbnail: str
+    page_width: float
+    page_height: float
+    rotation: int
 
-interface MergeService {
-  // 选择页面
-  selectPage(selectedPage: SelectedPage): void;
 
-  // 取消选择页面
-  deselectPage(pageId: string): void;
+class MergeConfig(BaseModel):
+    page_size: str = 'auto'  # 'A4', 'A3', 'Letter', 'auto'
+    orientation: str = 'keep-original'  # 'portrait', 'landscape', 'keep-original'
+    output_file_name: str
+    include_bookmarks: bool = False
+    metadata: Optional[dict] = None
 
-  // 批量选择页面范围
-  selectPageRange(documentId: string, startIndex: number, endIndex: number): void;
 
-  // 全选/取消全选文档的所有页面
-  toggleAllPages(documentId: string): void;
+class MergeResult(BaseModel):
+    success: bool
+    output_path: Optional[str] = None
+    total_pages: int
+    warnings: List[str] = []
+    error: Optional[str] = None
 
-  // 调整拼接队列中页面顺序
-  reorderPage(pageId: string, newIndex: number): void;
 
-  // 清空拼接队列
-  clearQueue(): void;
+class MergeService:
+    def select_page(self, selected_page: SelectedPage) -> None:
+        """选择页面"""
+        pass
 
-  // 获取当前拼接队列
-  getQueue(): SelectedPage[];
+    def deselect_page(self, page_id: str) -> None:
+        """取消选择页面"""
+        pass
 
-  // 生成合并后的PDF
-  mergeDocuments(config: MergeConfig): Promise<MergeResult>;
+    def select_page_range(
+        self, document_id: str, start_index: int, end_index: int
+    ) -> None:
+        """批量选择页面范围"""
+        pass
 
-  // 预览合并结果
-  previewMerge(): Promise<string[]>;
-}
+    def toggle_all_pages(self, document_id: str) -> None:
+        """全选/取消全选文档的所有页面"""
+        pass
+
+    def reorder_page(self, page_id: str, new_index: int) -> None:
+        """调整拼接队列中页面顺序"""
+        pass
+
+    def clear_queue(self) -> None:
+        """清空拼接队列"""
+        pass
+
+    def get_queue(self) -> List[SelectedPage]:
+        """获取当前拼接队列"""
+        pass
+
+    async def merge_documents(self, config: MergeConfig) -> MergeResult:
+        """生成合并后的PDF"""
+        pass
+
+    async def preview_merge(self) -> List[str]:
+        """预览合并结果"""
+        pass
 ```
 
 ## Data Models
 
 ### 文档模型
 
-```typescript
-interface Document {
-  id: string;
-  name: string;
-  type: DocumentType;
-  size: number;
-  createdAt: Date;
-  modifiedAt: Date;
-  pageCount: number;
-  previewUrl?: string;
-  metadata: DocumentMetadata;
-}
+```python
+from pydantic import BaseModel, Field
+from datetime import datetime
+from enum import Enum
+from typing import Optional
 
-enum DocumentType {
-  PDF = 'pdf',
-  WORD = 'word',
-  EXCEL = 'excel',
-  PPT = 'ppt',
-  IMAGE = 'image'
-}
 
-interface DocumentMetadata {
-  title?: string;
-  author?: string;
-  subject?: string;
-  keywords?: string;
-  creator?: string;
-  producer?: string;
-  creationDate?: Date;
-  modificationDate?: Date;
-}
+class DocumentType(str, Enum):
+    PDF = 'pdf'
+    WORD = 'word'
+    EXCEL = 'excel'
+    PPT = 'ppt'
+    IMAGE = 'image'
+
+
+class DocumentMetadata(BaseModel):
+    title: Optional[str] = None
+    author: Optional[str] = None
+    subject: Optional[str] = None
+    keywords: Optional[str] = None
+    creator: Optional[str] = None
+    producer: Optional[str] = None
+    creation_date: Optional[datetime] = None
+    modification_date: Optional[datetime] = None
+
+
+class Document(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    type: DocumentType
+    size: int
+    file_path: str
+    created_at: datetime = Field(default_factory=datetime.now)
+    modified_at: datetime = Field(default_factory=datetime.now)
+    page_count: int
+    thumbnail_path: Optional[str] = None
+    metadata: Optional[DocumentMetadata] = None
 ```
 
 ### 转换配置模型
 
-```typescript
-interface ConversionConfig {
-  sourceFormat: DocumentType;
-  targetFormat: DocumentType;
-  preserveFormatting: boolean;
-  outputQuality: number;        // 1-100
-  compressionLevel: number;      // 0-9
-  includeAnnotations: boolean;
-  password?: string;
-}
+```python
+class ConversionConfig(BaseModel):
+    source_format: DocumentType
+    target_format: DocumentType
+    preserve_formatting: bool = True
+    output_quality: int = Field(default=90, ge=1, le=100)
+    compression_level: int = Field(default=3, ge=0, le=9)
+    include_annotations: bool = False
+    password: Optional[str] = None
 ```
 
 ### 批注模型
 
-```typescript
-interface Annotation {
-  id: string;                    // UUID
-  documentId: string;
-  pageIndex: number;
-  position: Rectangle;
-  content: string;
-  author: string;
-  color: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+```python
+class Annotation(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    document_id: str
+    page_index: int
+    position: Rectangle
+    content: str
+    author: str
+    color: str = '#FF5722'
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 ```
 
 ### 页面模型
 
-```typescript
-interface Page {
-  index: number;
-  width: number;
-  height: number;
-  rotation: number;              // 0, 90, 180, 270
-  thumbnail: string;
-  content?: PageContent;
-}
+```python
+class PageContent(BaseModel):
+    text: Optional[str] = None
+    elements: Optional[List[dict]] = None
 
-interface PageContent {
-  text?: string;                 // 用于检索的文本内容
-  elements?: PageElement[];
-}
 
-interface PageElement {
-  type: 'text' | 'image' | 'table' | 'shape';
-  position: Rectangle;
-  content: any;
-  style?: any;
-}
+class Page(BaseModel):
+    index: int
+    width: float
+    height: float
+    rotation: int = 0  # 0, 90, 180, 270
+    thumbnail: str
+    content: Optional[PageContent] = None
 ```
 
 ### 拼接配置模型
 
-```typescript
-interface MergeConfig {
-  pageSize: 'A4' | 'A3' | 'Letter' | 'auto';
-  orientation: 'portrait' | 'landscape' | 'keep-original';
-  outputFileName: string;
-  includeBookmarks: boolean;
-  metadata?: {
-    title?: string;
-    author?: string;
-    subject?: string;
-  };
-}
+```python
+class MergeConfig(BaseModel):
+    page_size: str = 'auto'
+    orientation: str = 'keep-original'
+    output_file_name: str
+    include_bookmarks: bool = False
+    metadata: Optional[dict] = None
 
-interface SelectedPage {
-  id: string;
-  documentId: string;
-  pageIndex: number;
-  originalDocumentName: string;
-  thumbnail: string;
-  pageWidth: number;
-  pageHeight: number;
-  rotation: number;
-}
 
-interface MergeQueue {
-  pages: SelectedPage[];
-  totalCount: number;
-  documents: Set<string>;
-}
+class MergeQueue(BaseModel):
+    pages: List[SelectedPage] = []
+    total_count: int = 0
+    documents: set = set()
 ```
 
 ## Correctness Properties
@@ -641,31 +713,33 @@ interface MergeQueue {
 
 ### 阶段一：基础框架搭建
 
-1. 项目初始化（Vue 3 + Vite + TypeScript）
-2. 基础UI组件集成（Element Plus）
-3. 状态管理配置（Pinia）
-4. 路由配置
-5. 文件上传组件开发
+1. 后端项目初始化（FastAPI + Python）
+2. 前端项目初始化（Vue 3 + Vite + TypeScript）
+3. 数据库设计（SQLite）
+4. 基础UI组件集成（Element Plus）
+5. 状态管理配置（Pinia）
+6. API接口设计
 
 ### 阶段二：文档处理核心
 
-1. PDF解析和渲染（pdf.js）
-2. PDF生成（pdf-lib）
-3. Office文档解析（sheetjs, mammoth, pptxgenjs）
-4. 图片处理集成（html2canvas）
+1. PDF解析和渲染（PyPDF2, pdfplumber）
+2. PDF生成（reportlab）
+3. Office文档解析（python-docx, openpyxl, python-pptx）
+4. 图片处理集成（Pillow）
 5. 文档模型定义
+6. 文件上传API开发
 
 ### 阶段三：格式转换实现
 
-1. PDF与Word互转
-2. PDF与Excel互转
-3. PDF与PPT互转
-4. 图片与PDF互转
+1. PDF与Word互转（python-docx, docx2pdf）
+2. PDF与Excel互转（openpyxl, pandas）
+3. PDF与PPT互转（python-pptx）
+4. 图片与PDF互转（Pillow, reportlab）
 5. 转换向导UI开发
 
 ### 阶段四：全文检索功能
 
-1. 索引引擎集成（flexsearch）
+1. 索引引擎集成（Whoosh）
 2. 搜索界面开发
 3. 结果高亮显示
 4. 正则表达式支持
@@ -675,7 +749,7 @@ interface MergeQueue {
 1. 批注数据模型
 2. 批注标记UI
 3. 批注面板开发
-4. 本地存储持久化
+4. 本地存储持久化（SQLite）
 
 ### 阶段六：页面管理功能
 
@@ -708,8 +782,9 @@ interface MergeQueue {
 
 ## References
 
-[^1]: (Website) - [pdf.js Documentation](https://mozilla.github.io/pdf.js/)
-[^2]: (Website) - [pdf-lib Documentation](https://pdf-lib.js.org/)
-[^3]: (Website) - [SheetJS Documentation](https://docs.sheetjs.com/)
-[^4]: (Website) - [FlexSearch Documentation](https://github.com/nextapps-de/flexsearch)
-[^5]: (Website) - [Vue 3 Documentation](https://vuejs.org/)
+[^1]: (Website) - [FastAPI Documentation](https://fastapi.tiangolo.com/)
+[^2]: (Website) - [PyPDF2 Documentation](https://pypdf2.readthedocs.io/)
+[^3]: (Website) - [pdfplumber Documentation](https://github.com/jsvine/pdfplumber)
+[^4]: (Website) - [python-docx Documentation](https://python-docx.readthedocs.io/)
+[^5]: (Website) - [Whoosh Documentation](https://whoosh.readthedocs.io/)
+[^6]: (Website) - [Vue 3 Documentation](https://vuejs.org/)
