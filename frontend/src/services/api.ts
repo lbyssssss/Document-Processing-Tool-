@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'https://8dd7da69f7ae.monkeycode-ai.online:443/api/v1'
 
 const apiClient: AxiosInstance = axios.create({
   baseURL,

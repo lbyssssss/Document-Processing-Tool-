@@ -6,6 +6,10 @@ import uuid
 import os
 import logging
 
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 from app.models.document import DocumentType
 from app.services.converters import (
     PDFToWordConverter,
