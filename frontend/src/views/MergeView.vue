@@ -184,9 +184,26 @@
       <div v-if="previewPage" class="preview-container">
         <p><strong>文档：</strong>{{ previewPage.original_document_name }}</p>
         <p><strong>页码：</strong>第 {{ previewPage.page_index + 1 }} 页</p>
-        <div class="preview-image">
-          <img v-if="previewPage.thumbnail" :src="previewPage.thumbnail" alt="页面预览" />
-          <el-icon v-else :size="200"><Document /></el-icon>
+        <div class="preview-controls">
+          <el-button-group>
+            <el-button :disabled="previewScale <= 0.5" @click="zoomOut">
+              <el-icon><ZoomOut /></el-icon>
+              缩小
+            </el-button>
+            <el-button @click="resetZoom">
+              {{ Math.round(previewScale * 100) }}%
+            </el-button>
+            <el-button :disabled="previewScale >= 3" @click="zoomIn">
+              放大
+              <el-icon><ZoomIn /></el-icon>
+            </el-button>
+          </el-button-group>
+        </div>
+        <div class="preview-image-wrapper">
+          <div class="preview-image" :style="{ transform: `scale(${previewScale})` }">
+            <img v-if="previewPage.thumbnail" :src="previewPage.thumbnail" alt="页面预览" />
+            <el-icon v-else :size="200"><Document /></el-icon>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -210,6 +227,7 @@ import {
   Document,
   Close,
   ZoomIn,
+  ZoomOut,
 } from '@element-plus/icons-vue'
 import { useMergeStore } from '@/stores/merge'
 import { api } from '@/services/api'
@@ -229,6 +247,24 @@ const showPreviewDialog = ref(false)
 const previewPage = ref<any>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
+const previewScale = ref(1)
+
+// 缩放控制函数
+function zoomIn() {
+  if (previewScale.value < 3) {
+    previewScale.value = Math.min(previewScale.value + 0.25, 3)
+  }
+}
+
+function zoomOut() {
+  if (previewScale.value > 0.5) {
+    previewScale.value = Math.max(previewScale.value - 0.25, 0.5)
+  }
+}
+
+function resetZoom() {
+  previewScale.value = 1
+}
 
 async function handleFileUpload() {
   console.log('handleFileUpload 调用, selectedFiles:', selectedFiles.value)
@@ -374,11 +410,13 @@ function showPagePreview(doc: any, pageIndex: number) {
     page_index: pageIndex,
     thumbnail: doc.pages[pageIndex]?.thumbnail || '',
   }
+  previewScale.value = 1
   showPreviewDialog.value = true
 }
 
 function showPreview(page: any) {
   previewPage.value = page
+  previewScale.value = 1
   showPreviewDialog.value = true
 }
 
@@ -572,12 +610,28 @@ async function handleMerge() {
   text-align: center;
 }
 
-.preview-image {
+.preview-controls {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.preview-image-wrapper {
   margin-top: 20px;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 300px;
+  min-height: 400px;
+  overflow: auto;
+  max-height: 600px;
+}
+
+.preview-image {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.2s ease;
+  transform-origin: center center;
 }
 
 .preview-image img {
@@ -585,6 +639,7 @@ async function handleMerge() {
   max-height: 600px;
   border: 1px solid #eee;
   border-radius: 4px;
+  display: block;
 }
 
 .upload-area {
