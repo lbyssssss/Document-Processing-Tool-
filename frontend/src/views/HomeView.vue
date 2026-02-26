@@ -5,6 +5,9 @@
         <h1>文档处理工具</h1>
         <nav class="nav-menu">
           <el-button @click="$router.push('/conversion')">格式转换</el-button>
+          <el-button @click="$router.push('/search')">全文检索</el-button>
+          <el-button @click="$router.push('/annotation')">批注编辑</el-button>
+          <el-button @click="$router.push('/page-management')">页面管理</el-button>
           <el-button @click="$router.push('/merge')">文档拼接</el-button>
         </nav>
       </el-header>
@@ -13,27 +16,27 @@
           <h2>欢迎使用文档处理工具</h2>
           <p>支持PDF、Word、Excel、PPT、图片等常见格式的文档转换、检索、批注和页面管理。</p>
           <div class="feature-grid">
-            <el-card class="feature-item" shadow="hover">
+            <el-card class="feature-item" shadow="hover" @click="$router.push('/conversion')">
               <el-icon :size="40"><Document /></el-icon>
               <h3>格式转换</h3>
               <p>支持多种文档格式之间的相互转换</p>
             </el-card>
-            <el-card class="feature-item" shadow="hover">
+            <el-card class="feature-item" shadow="hover" @click="$router.push('/search')">
               <el-icon :size="40"><Search /></el-icon>
               <h3>全文检索</h3>
               <p>快速定位文档中的关键词</p>
             </el-card>
-            <el-card class="feature-item" shadow="hover">
+            <el-card class="feature-item" shadow="hover" @click="$router.push('/annotation')">
               <el-icon :size="40"><Edit /></el-icon>
               <h3>批注编辑</h3>
               <p>在文档上添加批注和标记</p>
             </el-card>
-            <el-card class="feature-item" shadow="hover">
+            <el-card class="feature-item" shadow="hover" @click="$router.push('/page-management')">
               <el-icon :size="40"><Memo /></el-icon>
               <h3>页面管理</h3>
               <p>对文档页面进行插入、删除、旋转等操作</p>
             </el-card>
-            <el-card class="feature-item" shadow="hover">
+            <el-card class="feature-item" shadow="hover" @click="$router.push('/merge')">
               <el-icon :size="40"><Link /></el-icon>
               <h3>文档拼接</h3>
               <p>将多个文档的指定页面合并为一个新文档</p>

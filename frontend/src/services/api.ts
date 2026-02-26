@@ -145,4 +145,50 @@ export const api = {
     const res = await apiClient.post('/merge/execute', config)
     return res.data
   },
+
+  // 批注
+  async getAnnotations(documentId: string) {
+    const res = await apiClient.get(`/annotation/${documentId}`)
+    return res.data
+  },
+
+  async addAnnotation(documentId: string, annotation: any) {
+    const res = await apiClient.post(`/annotation/${documentId}`, annotation)
+    return res.data
+  },
+
+  async deleteAnnotation(documentId: string, annotationId: string) {
+    const res = await apiClient.delete(`/annotation/${documentId}/${annotationId}`)
+    return res.data
+  },
+
+  // 页面管理
+  async uploadDocument(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await apiClient.post('/page/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
+  },
+
+  async getPages(documentId: string) {
+    const res = await apiClient.get(`/page/${documentId}/pages`)
+    return res.data
+  },
+
+  async updatePage(documentId: string, pageId: string, operation: any) {
+    const res = await apiClient.post(`/page/${documentId}/pages/${pageId}`, operation)
+    return res.data
+  },
+
+  async addPage(documentId: string, page: any) {
+    const res = await apiClient.post(`/page/${documentId}/pages`, page)
+    return res.data
+  },
+
+  async getPageThumbnail(documentId: string, pageNumber: number) {
+    const res = await apiClient.get(`/page/${documentId}/page/${pageNumber}/thumbnail`)
+    return res.data
+  },
 }

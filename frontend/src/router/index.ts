@@ -12,6 +12,21 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ConversionView.vue'),
   },
   {
+    path: '/search',
+    name: 'Search',
+    component: () => import('@/views/SearchView.vue'),
+  },
+  {
+    path: '/annotation',
+    name: 'Annotation',
+    component: () => import('@/views/AnnotationView.vue'),
+  },
+  {
+    path: '/page-management',
+    name: 'PageManagement',
+    component: () => import('@/views/PageManagementView.vue'),
+  },
+  {
     path: '/merge',
     name: 'Merge',
     component: () => import('@/views/MergeView.vue'),
