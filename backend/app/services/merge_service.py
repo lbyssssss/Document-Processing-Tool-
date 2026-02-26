@@ -80,11 +80,20 @@ class MergeService:
         # 确保文档信息存在
         doc_id = selected_page.document_id
         if doc_id not in self._documents:
-            self._documents[doc_id] = {
-                "id": doc_id,
-                "name": selected_page.original_document_name,
-                "path": f"{settings.upload_dir}/{doc_id}.pdf",
-            }
+            # 先从上传目录查找文档
+            import glob
+            import os
+            upload_path = Path(settings.upload_dir)
+            existing_files = list(upload_path.glob(f"{doc_id}.pdf"))
+            if existing_files:
+                doc_path = existing_files[0]
+                self._documents[doc_id] = {
+                    "id": doc_id,
+                    "name": selected_page.original_document_name,
+                    "path": str(doc_path),
+                }
+            else:
+                return {"status": "error", "error": f"文档 {doc_id} 不存在"}
 
         return {"status": "selected", "queue_size": len(self._queue)}
 
