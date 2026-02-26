@@ -247,11 +247,13 @@ async function handleFileUpload() {
     const uploadPromises = selectedFiles.value.map(async (file) => {
       console.log('上传文件:', file.name, file.size)
       const result = await api.uploadDocument(file)
+      console.log('上传结果:', result)
 
       // 获取文档页面列表
       if (result.status === 'uploaded') {
         const documentId = result.document_id
         const pagesResult = await api.getDocumentPages(documentId)
+        console.log('文档页面结果:', pagesResult)
 
         return {
           success: true,
