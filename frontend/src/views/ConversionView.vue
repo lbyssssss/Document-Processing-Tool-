@@ -98,12 +98,8 @@ const conversionOptions = ref({
   dpi: 200,
 })
 
-// 演示模式检测
-const isDemoMode = import.meta.env.DEV === false
-
-if (isDemoMode) {
-  demoMode.value = true
-}
+// 演示模式检测 - 预览环境使用外部 API
+const isDemoMode = false
 
 function handleFileChange(file: UploadFile) {
   if (file.raw) {
