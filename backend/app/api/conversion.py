@@ -1,5 +1,6 @@
 # Conversion API
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from pathlib import Path
@@ -329,5 +330,26 @@ async def list_output_files():
 
         return {"files": files}
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/conversion/download/{filename:path}")
+async def download_output_file(filename: str):
+    """下载转换后的文件"""
+    try:
+        file_path = Path(settings.output_dir) / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="文件不存在")
+
+        return FileResponse(
+            path=str(file_path),
+            filename=filename,
+            media_type='application/octet-stream'
+        )
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

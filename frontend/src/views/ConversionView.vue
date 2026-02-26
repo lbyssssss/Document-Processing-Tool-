@@ -194,8 +194,19 @@ async function handleConvert() {
 }
 
 function handleDownload() {
-  if (outputFileInfo.value && isDemoMode) {
-    alert('演示模式：这是模拟的文件，实际文件需要后端支持')
+  if (!outputFileInfo.value) return
+
+  // 从输出路径中提取文件名
+  const outputPath = outputFileInfo.value.path || ''
+  const filename = outputPath.split('/').pop() || outputFileInfo.value.name.replace(/\.[^.]+$/, '') + '.' + outputFileInfo.value.format
+
+  downloading.value = true
+  try {
+    api.downloadConvertedFile(filename)
+  } catch (error: any) {
+    errorMessage.value = `下载失败：${error.message || error}`
+  } finally {
+    downloading.value = false
   }
 }
 </script>

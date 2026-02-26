@@ -192,4 +192,15 @@ export const api = {
     const res = await apiClient.get(`/page/${documentId}/page/${pageNumber}/thumbnail`)
     return res.data
   },
+
+  // 下载转换后的文件
+  downloadConvertedFile(filename: string) {
+    const url = `/api/v1/conversion/download/${filename}`
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  },
 }
