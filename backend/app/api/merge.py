@@ -101,6 +101,7 @@ async def upload_document(file: UploadFile = File(...)):
         "document_id": doc_id,
         "filename": file.filename,
         "status": "uploaded",
+        "page_count": 0,
     }
 
 
