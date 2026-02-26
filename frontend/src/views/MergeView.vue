@@ -90,12 +90,20 @@
                   <div class="queue-item-info">
                     <div class="queue-item-name">{{ page.original_document_name }}</div>
                     <div class="queue-item-page">第 {{ page.page_index + 1 }} 页</div>
+                    <div class="queue-item-actions">
+                      <el-button
+                        size="small"
+                        circle
+                        @click.stop="showPreview(page)"
+                      >
+                        预览
+                      </el-button>
+                    </div>
                   </div>
                   <el-button
                     size="small"
                     type="danger"
-                    circle
-                    @click="removeFromQueue(page.id)"
+                    @click.stop="removeFromQueue(page.id)"
                   >
                     <el-icon><Delete /></el-icon>
                   </el-button>
@@ -124,21 +132,22 @@
     </el-container>
 
     <!-- 上传对话框 -->
-    <el-dialog v-model="showUploadDialog" title="上传文档" width="500px">
+    <el-dialog v-model="showUploadDialog" title="上传文档" width="600px">
       <el-upload
         drag
         :auto-upload="false"
         :on-change="handleUploadChange"
-        :limit="1"
+        :limit="10"
         accept=".pdf"
+        multiple
       >
         <el-icon :size="60"><UploadFilled /></el-icon>
         <div class="el-upload__text">
-          将 PDF 文件拖到此处，或<em>点击上传</em>
+          支持批量上传 PDF 文件，最多 10 个
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            支持 PDF 格式，最大 100MB
+            支持 PDF 格式，单个文件最大 100MB
           </div>
         </template>
       </el-upload>
@@ -148,6 +157,23 @@
           <el-button type="primary" @click="handleFileUpload" :loading="uploading">
             上传
           </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 页面预览对话框 -->
+    <el-dialog v-model="showPreviewDialog" title="页面预览" width="800px">
+      <div v-if="previewPage" class="preview-container">
+        <p><strong>文档：</strong>{{ previewPage.original_document_name }}</p>
+        <p><strong>页码：</strong>第 {{ previewPage.page_index + 1 }} 页</p>
+        <div class="preview-image">
+          <img v-if="previewPage.thumbnail" :src="previewPage.thumbnail" alt="页面预览" />
+          <el-icon v-else :size="200"><Document /></el-icon>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showPreviewDialog = false">关闭</el-button>
         </span>
       </template>
     </el-dialog>
@@ -181,10 +207,12 @@ const merging = ref(false)
 const uploading = ref(false)
 
 const documents = ref<any[]>([])
-const uploadingFile = ref<File | null>(null)
+const uploadingFiles = ref<File[]>([])
+const showPreviewDialog = ref(false)
+const previewPage = ref<any>(null)
 
 async function handleFileUpload() {
-  if (!uploadingFile.value) {
+  if (uploadingFiles.value.length === 0) {
     ElMessage.warning('请选择文件')
     return
   }
@@ -192,27 +220,48 @@ async function handleFileUpload() {
   uploading.value = true
 
   try {
-    const result = await api.uploadDocument(uploadingFile.value)
-
-    // API 返回 {document_id, filename, status}
-    if (result.status === 'uploaded') {
-      const documentId = result.document_id
+    // 批量上传所有文件
+    const uploadPromises = uploadingFiles.value.map(async (file) => {
+      const result = await api.uploadDocument(file)
 
       // 获取文档页面列表
-      const pagesResult = await api.getDocumentPages(documentId)
+      if (result.status === 'uploaded') {
+        const documentId = result.document_id
+        const pagesResult = await api.getDocumentPages(documentId)
 
-      documents.value.push({
-        id: documentId,
-        name: result.filename,
-        pages: pagesResult.pages || [],
-      })
-
-      if (documents.value.length === 1) {
-        activeDocumentId.value = documentId
+        return {
+          success: true,
+          documentId,
+          filename: result.filename,
+          pages: pagesResult.pages || [],
+        }
       }
 
-      ElMessage.success(`文档上传成功，共 ${pagesResult.page_count || 0} 页`)
+      return null
+    })
+
+    const uploadResults = await Promise.all(uploadPromises)
+
+    let successCount = 0
+    uploadResults.forEach((result: any) => {
+      if (result && result.success) {
+        documents.value.push({
+          id: result.documentId,
+          name: result.filename,
+          pages: result.pages || [],
+        })
+        if (documents.value.length === 1) {
+          activeDocumentId.value = result.documentId
+        }
+        successCount++
+      }
+    })
+
+    if (successCount > 0) {
+      ElMessage.success(`成功上传 ${successCount} 个文档`)
       showUploadDialog.value = false
+      // 清空上传文件列表
+      uploadingFiles.value = []
     } else {
       ElMessage.error('文档上传失败')
     }
@@ -220,14 +269,13 @@ async function handleFileUpload() {
     ElMessage.error(`上传失败：${error.message}`)
   } finally {
     uploading.value = false
-    uploadingFile.value = null
+    uploadingFiles.value = []
   }
 }
 
-function handleUploadChange(file: UploadFile) {
-  if (file.raw) {
-    uploadingFile.value = file.raw
-  }
+function handleUploadChange(files: UploadFile[]) {
+  // 只存储文件，不立即上传
+  uploadingFiles.value = Array.from(files).map(f => f.raw as File).filter(Boolean)
 }
 
 function isPageSelected(docId: string, pageIndex: number): boolean {
@@ -286,6 +334,11 @@ function removeDocument(docId: string) {
   }
 }
 
+function showPreview(page: any) {
+  previewPage.value = page
+  showPreviewDialog.value = true
+}
+
 async function handleMerge() {
   merging.value = true
   try {
@@ -297,12 +350,17 @@ async function handleMerge() {
       if (result.output_path) {
         // 从 output_path 中提取文件名（移除任何路径前缀）
         const filename = result.output_path.replace(/^.*[\/\\]/, '')
-        // 使用后端 API 下载
-        const downloadUrl = `/api/v1/merge/download/${filename}`
-        const link = document.createElement('a')
-        link.href = downloadUrl
-        link.download = filename
-        link.click()
+        // 使用 fetch GET 请求下载文件
+        fetch(`/api/v1/merge/download/${filename}`)
+          .then(response => response.blob())
+          .then(blob => {
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = filename
+            link.click()
+            window.URL.revokeObjectURL(url)
+          })
       }
     } else {
       ElMessage.error(`合并失败：${result.error}`)
@@ -447,5 +505,24 @@ async function handleMerge() {
 
 .queue-actions .el-button {
   flex: 1;
+}
+
+.preview-container {
+  text-align: center;
+}
+
+.preview-image {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.preview-image img {
+  max-width: 100%;
+  max-height: 600px;
+  border: 1px solid #eee;
+  border-radius: 4px;
 }
 </style>
