@@ -96,6 +96,28 @@ class MergeService:
                 return {"status": "error", "error": f"文档 {doc_id} 不存在"}
 
         return {"status": "selected", "queue_size": len(self._queue)}
+        # 先检查文档是否在队列中（优先从队列获取文档信息）
+        for page in self._queue:
+            if page.document_id == document_id:
+                # 从上传目录查找文档
+                import glob
+                upload_path = Path(settings.upload_dir)
+                existing_files = list(upload_path.glob(f"{document_id}.pdf"))
+                if existing_files:
+                    doc_path = existing_files[0]
+                    return self._get_pdf_pages_info(str(doc_path), page.original_document_name, document_id)
+
+        # 如果队列中没有找到，尝试从 _documents 获取
+        doc_info = self._documents.get(document_id)
+        if doc_info:
+            pdf_path = doc_info.get("path")
+            if pdf_path and Path(pdf_path).exists():
+                return self._get_pdf_pages_info(str(pdf_path), doc_info.get("name"), document_id)
+
+        return {
+            "success": False,
+            "error": f"文档 {document_id} 不存在",
+        }
 
     def deselect_page(self, page_id: str) -> dict:
         """取消选择页面"""
@@ -378,63 +400,25 @@ class MergeService:
 
     async def get_document_pages(self, document_id: str) -> dict:
         """获取文档的所有页面信息"""
+        # 先检查文档是否在队列中（优先从队列获取文档信息）
+        for page in self._queue:
+            if page.document_id == document_id:
+                # 从上传目录查找文档
+                import glob
+                upload_path = Path(settings.upload_dir)
+                existing_files = list(upload_path.glob(f"{document_id}.pdf"))
+                if existing_files:
+                    doc_path = existing_files[0]
+                    return self._get_pdf_pages_info(str(doc_path), page.original_document_name, document_id)
+
+        # 如果队列中没有找到，尝试从 _documents 获取
         doc_info = self._documents.get(document_id)
+        if doc_info:
+            pdf_path = doc_info.get("path")
+            if pdf_path and Path(pdf_path).exists():
+                return self._get_pdf_pages_info(str(pdf_path), doc_info.get("name"), document_id)
 
-        if not doc_info:
-            return {
-                "success": False,
-                "error": f"文档 {document_id} 不存在",
-            }
-
-        try:
-            from PyPDF2 import PdfReader
-            from app.services.converters.pdf_merge import DocumentMergeConverter
-
-            pdf_path = Path(doc_info["path"])
-            reader = PdfReader(str(pdf_path))
-
-            # 获取页面信息和缩略图
-            converter = DocumentMergeConverter(Path(settings.thumbnail_dir))
-            page_info = converter.get_pdf_page_info(pdf_path)
-
-            if not page_info.get("success"):
-                return {
-                    "success": False,
-                    "error": page_info.get("error"),
-                }
-
-            pages_data = []
-            for i, info in enumerate(page_info["pages"]):
-                # 提取页面缩略图
-                thumbnails_result = converter.extract_page_thumbnails(
-                    pdf_path,
-                    pages=[i],
-                    size=(300, 420),  # 更大的预览尺寸
-                )
-
-                if thumbnails_result.get("success"):
-                    thumbnail_base64 = thumbnails_result["thumbnails"][0]["thumbnail"]
-                else:
-                    thumbnail_base64 = None
-
-                pages_data.append({
-                    "page_number": info["page_number"],
-                    "width": info["width"],
-                    "height": info["height"],
-                    "rotation": info["rotation"],
-                    "thumbnail": thumbnail_base64,
-                })
-
-            return {
-                "success": True,
-                "document_id": document_id,
-                "document_name": doc_info["name"],
-                "total_pages": page_info["total_pages"],
-                "pages": pages_data,
-            }
-
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-            }
+        return {
+            "success": False,
+            "error": f"文档 {document_id} 不存在",
+        }
