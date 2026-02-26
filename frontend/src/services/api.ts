@@ -167,7 +167,7 @@ export const api = {
   async uploadDocument(file: File) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await apiClient.post('/page/upload', formData, {
+    const res = await apiClient.post('/merge/upload-document', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return res.data

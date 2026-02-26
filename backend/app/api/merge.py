@@ -1,8 +1,9 @@
 # Merge API
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import List, Optional
 from pathlib import Path
+import shutil
 
 from app.core.config import settings
 from app.services.merge_service import (
@@ -82,15 +83,8 @@ def _to_pydantic_result(result: MergeServiceMergeResult) -> MergeResultPydantic:
 
 
 @router.post("/merge/upload-document")
-async def upload_document(file_path: str):
+async def upload_document(file: UploadFile = File(...)):
     """上传文档用于合并"""
-    # 验证文件是否存在
-    import shutil
-    from datetime import datetime
-
-    if not Path(file_path).exists():
-        raise HTTPException(status_code=404, detail="文件不存在")
-
     # 生成文档ID
     import uuid
     doc_id = str(uuid.uuid4())
@@ -99,12 +93,13 @@ async def upload_document(file_path: str):
     target_filename = f"{doc_id}.pdf"
     target_path = Path(settings.upload_dir) / target_filename
 
-    # 复制文件
-    shutil.copy2(file_path, target_path)
+    # 保存文件
+    with open(target_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
 
     return {
         "document_id": doc_id,
-        "filename": Path(file_path).name,
+        "filename": file.filename,
         "status": "uploaded",
     }
 
