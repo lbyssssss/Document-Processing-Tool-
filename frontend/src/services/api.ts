@@ -92,6 +92,17 @@ export const api = {
     return res.data
   },
 
+  async pdfToImages(file: File, options?: any) {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (options?.quality) formData.append('quality', options.quality.toString())
+    if (options?.dpi) formData.append('dpi', options.dpi.toString())
+    const res = await apiClient.post('/conversion/pdf-to-images', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
+  },
+
   async imagesToPdf(files: File[], options?: any) {
     const formData = new FormData()
     files.forEach(file => formData.append('files', file))

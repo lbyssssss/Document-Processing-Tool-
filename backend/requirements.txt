@@ -16,5 +16,4 @@ pillow>=10.2.0
 whoosh>=2.7.4
 sqlalchemy>=2.0.25
 aiosqlite>=0.19.0
-python-mose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4

@@ -44,8 +44,11 @@
             <el-form-item label="保持格式">
               <el-switch v-model="conversionOptions.preserve_formatting" />
             </el-form-item>
-            <el-form-item label="输出质量">
+            <el-form-item v-if="targetFormat === 'image'" label="输出质量">
               <el-slider v-model="conversionOptions.quality" :min="1" :max="100" />
+            </el-form-item>
+            <el-form-item v-if="targetFormat === 'image'" label="DPI">
+              <el-slider v-model="conversionOptions.dpi" :min="72" :max="300" :step="12" />
             </el-form-item>
           </el-form>
           <el-button type="primary" @click="handleConvert" :loading="converting">
@@ -71,11 +74,23 @@ const targetFormat = ref('pdf')
 const conversionOptions = ref({
   preserve_formatting: true,
   quality: 90,
+  dpi: 200,
 })
 
 function handleFileChange(file: UploadFile) {
   if (file.raw) {
     selectedFile.value = file.raw
+    // 根据文件扩展名设置默认目标格式
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (ext === 'pdf') {
+      targetFormat.value = 'word'
+    } else if (ext === 'doc' || ext === 'docx') {
+      targetFormat.value = 'pdf'
+    } else if (ext === 'xls' || ext === 'xlsx') {
+      targetFormat.value = 'pdf'
+    } else if (ext === 'ppt' || ext === 'pptx') {
+      targetFormat.value = 'pdf'
+    }
   }
 }
 
@@ -85,14 +100,54 @@ async function handleConvert() {
   converting.value = true
   try {
     let result
+    const fileExt = selectedFile.value.name.split('.').pop()?.toLowerCase()
+
     switch (targetFormat.value) {
       case 'pdf':
-        result = await api.wordToPdf(selectedFile.value)
+        // 根据源文件类型选择转换方法
+        if (fileExt === 'doc' || fileExt === 'docx') {
+          result = await api.wordToPdf(selectedFile.value)
+        } else if (fileExt === 'xls' || fileExt === 'xlsx') {
+          result = await api.excelToPdf(selectedFile.value)
+        } else if (fileExt === 'ppt' || fileExt === 'pptx') {
+          result = await api.pptToPdf(selectedFile.value)
+        } else {
+          result = { success: false, error: '不支持的源格式转换为PDF' }
+        }
         break
+
       case 'word':
-        result = await api.pdfToWord(selectedFile.value)
+        if (fileExt === 'pdf') {
+          result = await api.pdfToWord(selectedFile.value)
+        } else {
+          result = { success: false, error: '只有PDF可以转换为Word' }
+        }
         break
-      // 添加其他格式转换
+
+      case 'excel':
+        if (fileExt === 'pdf') {
+          result = await api.pdfToExcel(selectedFile.value)
+        } else {
+          result = { success: false, error: '只有PDF可以转换为Excel' }
+        }
+        break
+
+      case 'ppt':
+        if (fileExt === 'pdf') {
+          result = await api.pdfToPpt(selectedFile.value)
+        } else {
+          result = { success: false, error: '只有PDF可以转换为PPT' }
+        }
+        break
+
+      case 'image':
+        if (fileExt === 'pdf') {
+          result = await api.pdfToImages(selectedFile.value, conversionOptions.value)
+        } else {
+          result = { success: false, error: '只有PDF可以转换为图片' }
+        }
+        break
+
       default:
         result = { success: false, error: '不支持的转换' }
     }

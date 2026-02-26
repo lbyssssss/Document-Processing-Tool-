@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # Search Index
     search_index_dir: str = "storage/db/search_index"
+    index_dir: str = "storage/db/search_index"  # 别名，用于向后兼容
 
     model_config = SettingsConfigDict(
         env_file=".env",

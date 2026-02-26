@@ -37,10 +37,10 @@ async def health_check():
 
 
 # Include routers
-# from app.api import conversion, search, annotation, page, batch, merge
-# app.include_router(conversion.router, prefix=settings.api_prefix, tags=["conversion"])
-# app.include_router(search.router, prefix=settings.api_prefix, tags=["search"])
-# app.include_router(annotation.router, prefix=settings.api_prefix, tags=["annotation"])
-# app.include_router(page.router, prefix=settings.api_prefix, tags=["page"])
-# app.include_router(batch.router, prefix=settings.api_prefix, tags=["batch"])
-# app.include_router(merge.router, prefix=settings.api_prefix, tags=["merge"])
+from app.api import conversion, search, annotation, page, batch, merge
+app.include_router(conversion.router, prefix=settings.api_prefix, tags=["conversion"])
+app.include_router(search.router, prefix=settings.api_prefix, tags=["search"])
+app.include_router(annotation.router, prefix=settings.api_prefix, tags=["annotation"])
+app.include_router(page.router, prefix=settings.api_prefix, tags=["page"])
+app.include_router(batch.router, prefix=settings.api_prefix, tags=["batch"])
+app.include_router(merge.router, prefix=settings.api_prefix, tags=["merge"])
