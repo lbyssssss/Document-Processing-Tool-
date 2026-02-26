@@ -4,10 +4,8 @@ from docx.shared import Inches, Pt
 from pathlib import Path
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from typing import Optional
-import io
-
 
 class WordToPDFConverter:
     """Word转PDF转换器"""
@@ -66,15 +64,20 @@ class WordToPDFConverter:
             # 添加Word段落到PDF
             styles = self._get_sample_styles()
 
+            story = []
+
             for i, para_text in enumerate(content.get("paragraphs", [])):
                 p = Paragraph(para_text, styles["BodyText"])
-                pdf.build([p])
-                # 注意：每个段落单独build效率低，实际应收集后一次性build
-                # 这里简化处理
+                story.append(p)
+                # 添加段落间空格
+                story.append(Spacer(1, 0.2 * Inch))
 
             # 添加表格
             for table in content.get("tables", []):
-                self._add_table_to_pdf(pdf, table)
+                self._add_table_to_pdf(story, table)
+
+            # 一次性build所有内容
+            pdf.build(story)
 
             return {
                 "success": True,
@@ -101,7 +104,7 @@ class WordToPDFConverter:
             "BodyText": styles["BodyText"],
         }
 
-    def _add_table_to_pdf(self, pdf, table_data: list) -> None:
+    def _add_table_to_pdf(self, story: list, table_data: list) -> None:
         """添加表格到PDF"""
         from reportlab.platypus import Table, TableStyle
 
@@ -123,5 +126,5 @@ class WordToPDFConverter:
         # 创建表格
         t = Table(table_data)
         t.setStyle(style)
-        t.wrapOn(pdf, 6.5 * inch, 9.5 * inch)
-        pdf.build([t])
+        t.wrapOn(pdf, 6.5 * Inch, 9.5 * Inch)
+        story.append(t)
