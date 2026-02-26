@@ -188,9 +188,20 @@ class PDFToExcelConverter:
         # 保存文件
         wb.save(str(self.output_path))
 
+        # 验证文件是否成功创建
+        if not self.output_path.exists():
+            return {
+                "success": False,
+                "error": "输出文件创建失败",
+            }
+
+        # 获取文件大小
+        file_size = self.output_path.stat().st_size
+
         return {
             "success": True,
             "output_file": str(self.output_path),
             "method_used": method,
             "rows_written": ws.max_row if ws.max_row else 0,
+            "file_size": file_size,
         }
