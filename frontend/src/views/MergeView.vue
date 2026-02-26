@@ -136,7 +136,9 @@
       <el-upload
         drag
         :auto-upload="false"
+        :file-list="fileList"
         :on-change="handleUploadChange"
+        :on-remove="handleUploadRemove"
         :limit="10"
         accept=".pdf"
         multiple
@@ -194,7 +196,6 @@ import {
 } from '@element-plus/icons-vue'
 import { useMergeStore } from '@/stores/merge'
 import { api } from '@/services/api'
-import type { UploadFile } from 'element-plus'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -207,12 +208,12 @@ const merging = ref(false)
 const uploading = ref(false)
 
 const documents = ref<any[]>([])
-const uploadingFiles = ref<File[]>([])
 const showPreviewDialog = ref(false)
 const previewPage = ref<any>(null)
+const fileList = ref<any[]>([])
 
 async function handleFileUpload() {
-  if (uploadingFiles.value.length === 0) {
+  if (fileList.value.length === 0) {
     ElMessage.warning('请选择文件')
     return
   }
@@ -220,8 +221,13 @@ async function handleFileUpload() {
   uploading.value = true
 
   try {
+    // 从 fileList 中提取 File 对象
+    const filesToUpload = fileList.value
+      .map(item => item.raw as File)
+      .filter(Boolean)
+
     // 批量上传所有文件
-    const uploadPromises = uploadingFiles.value.map(async (file) => {
+    const uploadPromises = filesToUpload.map(async (file) => {
       const result = await api.uploadDocument(file)
 
       // 获取文档页面列表
@@ -261,7 +267,7 @@ async function handleFileUpload() {
       ElMessage.success(`成功上传 ${successCount} 个文档`)
       showUploadDialog.value = false
       // 清空上传文件列表
-      uploadingFiles.value = []
+      fileList.value = []
     } else {
       ElMessage.error('文档上传失败')
     }
@@ -269,13 +275,17 @@ async function handleFileUpload() {
     ElMessage.error(`上传失败：${error.message}`)
   } finally {
     uploading.value = false
-    uploadingFiles.value = []
+    fileList.value = []
   }
 }
 
-function handleUploadChange(files: UploadFile[]) {
-  // 只存储文件，不立即上传
-  uploadingFiles.value = Array.from(files).map(f => f.raw as File).filter(Boolean)
+function handleUploadChange(file: any, uploadFiles: any[]) {
+  // el-upload 会自动更新 fileList，我们不需要手动操作
+  // 只在关闭对话框时清空
+}
+
+function handleUploadRemove(file: any, uploadFiles: any[]) {
+  // el-upload 会自动更新 fileList
 }
 
 function isPageSelected(docId: string, pageIndex: number): boolean {
