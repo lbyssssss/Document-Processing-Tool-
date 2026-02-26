@@ -1,8 +1,9 @@
 # Merge API
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import List, Optional
 from pathlib import Path
+import shutil
 
 from app.core.config import settings
 from app.services.merge_service import (
@@ -82,15 +83,8 @@ def _to_pydantic_result(result: MergeServiceMergeResult) -> MergeResultPydantic:
 
 
 @router.post("/merge/upload-document")
-async def upload_document(file_path: str):
+async def upload_document(file: UploadFile = File(...)):
     """上传文档用于合并"""
-    # 验证文件是否存在
-    import shutil
-    from datetime import datetime
-
-    if not Path(file_path).exists():
-        raise HTTPException(status_code=404, detail="文件不存在")
-
     # 生成文档ID
     import uuid
     doc_id = str(uuid.uuid4())
@@ -99,13 +93,22 @@ async def upload_document(file_path: str):
     target_filename = f"{doc_id}.pdf"
     target_path = Path(settings.upload_dir) / target_filename
 
-    # 复制文件
-    shutil.copy2(file_path, target_path)
+    # 保存文件
+    with open(target_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    # 将文档信息添加到 merge_service 中
+    merge_service._documents[doc_id] = {
+        "id": doc_id,
+        "name": file.filename,
+        "path": str(target_path),
+    }
 
     return {
         "document_id": doc_id,
-        "filename": Path(file_path).name,
+        "filename": file.filename,
         "status": "uploaded",
+        "page_count": 0,
     }
 
 
@@ -179,10 +182,16 @@ async def get_queue():
 @router.post("/merge/execute", response_model=MergeResultPydantic)
 async def merge_documents(config: MergeConfigPydantic):
     """生成合并后的PDF"""
-    service_config = _to_service_config(config)
-    result = await merge_service.merge_documents(service_config)
-
-    return _to_pydantic_result(result)
+    try:
+        service_config = _to_service_config(config)
+        result = await merge_service.merge_documents(service_config)
+        return _to_pydantic_result(result)
+    except TypeError as e:
+        import traceback
+        traceback.print_exc()
+        return _to_pydantic_result(
+            MergeServiceMergeResult(success=False, total_pages=0, error=str(e))
+        )
 
 
 @router.get("/merge/preview")
@@ -201,4 +210,31 @@ async def get_document_pages(document_id: str):
     if result.get("success"):
         return result
     else:
-        raise HTTPException(status_code=500, detail=result.get("error", "Unknown error"))
+        error_msg = result.get("error", "Unknown error")
+        # 如果是"文档不存在"的错误，返回404；其他错误返回500
+        if "不存在" in error_msg:
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=500, detail=error_msg)
+
+
+@router.get("/merge/download/{filename}")
+async def download_merged_file(filename: str):
+    """下载合并后的PDF文件"""
+    try:
+        from fastapi.responses import FileResponse
+
+        file_path = Path(settings.output_dir) / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail=f"文件 {filename} 不存在")
+
+        return FileResponse(
+            path=str(file_path),
+            filename=filename,
+            media_type='application/pdf'
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

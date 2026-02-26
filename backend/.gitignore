@@ -24,6 +24,7 @@ build/
 storage/uploads/*
 storage/outputs/*
 storage/thumbnails/*
+storage/db/*
 !storage/uploads/.gitkeep
 !storage/outputs/.gitkeep
 !storage/thumbnails/.gitkeep

@@ -1,7 +1,8 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+// 使用相对路径，由 vite 代理转发到后端
+const baseURL = '/api/v1'
 
 const apiClient: AxiosInstance = axios.create({
   baseURL,
@@ -125,6 +126,12 @@ export const api = {
     return res.data
   },
 
+  // 获取文档页面
+  async getDocumentPages(documentId: string) {
+    const res = await apiClient.get(`/merge/documents/${documentId}/pages`)
+    return res.data
+  },
+
   // 拼接
   async selectPage(page: any) {
     const res = await apiClient.post('/merge/select-page', page)
@@ -144,5 +151,62 @@ export const api = {
   async mergeDocuments(config: any) {
     const res = await apiClient.post('/merge/execute', config)
     return res.data
+  },
+
+  // 批注
+  async getAnnotations(documentId: string) {
+    const res = await apiClient.get(`/annotation/${documentId}`)
+    return res.data
+  },
+
+  async addAnnotation(documentId: string, annotation: any) {
+    const res = await apiClient.post(`/annotation/${documentId}`, annotation)
+    return res.data
+  },
+
+  async deleteAnnotation(documentId: string, annotationId: string) {
+    const res = await apiClient.delete(`/annotation/${documentId}/${annotationId}`)
+    return res.data
+  },
+
+  // 页面管理
+  async uploadDocument(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await apiClient.post('/merge/upload-document', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
+  },
+
+  async getPages(documentId: string) {
+    const res = await apiClient.get(`/page/${documentId}/pages`)
+    return res.data
+  },
+
+  async updatePage(documentId: string, pageId: string, operation: any) {
+    const res = await apiClient.post(`/page/${documentId}/pages/${pageId}`, operation)
+    return res.data
+  },
+
+  async addPage(documentId: string, page: any) {
+    const res = await apiClient.post(`/page/${documentId}/pages`, page)
+    return res.data
+  },
+
+  async getPageThumbnail(documentId: string, pageNumber: number) {
+    const res = await apiClient.get(`/page/${documentId}/page/${pageNumber}/thumbnail`)
+    return res.data
+  },
+
+  // 下载转换后的文件
+  downloadConvertedFile(filename: string) {
+    const url = `/api/v1/conversion/download/${filename}`
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   },
 }

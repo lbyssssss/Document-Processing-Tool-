@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import List, Optional
 from PIL import Image
 import io
+import base64
+from pdf2image import convert_from_bytes
 
 
 class DocumentMergeConverter:
@@ -83,8 +85,8 @@ class DocumentMergeConverter:
         self,
         pdf_path: Path,
         pages: Optional[List[int]] = None,
-        size: tuple[int, int] = (200, 280),
-    ) -> List[dict]:
+        size: tuple[int, int] = (300, 420),
+    ) -> dict:
         """从PDF中提取页面缩略图
 
         Args:
@@ -99,22 +101,58 @@ class DocumentMergeConverter:
             # 确定要处理的页码
             page_numbers = list(range(len(reader.pages))) if pages is None else pages
 
-            for page_num in page_numbers:
+            # 使用 pdf2image 将 PDF 转换为图片，使用更高的 DPI 获得更清晰的图片
+            try:
+                images = convert_from_bytes(
+                    pdf_path.read_bytes(),
+                    first_page=page_numbers[0] + 1 if page_numbers else 1,
+                    last_page=(page_numbers[-1] + 1) if page_numbers else len(reader.pages),
+                    dpi=300,  # 提高 DPI 从 150 到 300
+                    thread_count=2,  # 使用多线程加速
+                )
+            except Exception as e:
+                # 如果 pdf2image 失败，返回基本信息
+                for page_num in page_numbers:
+                    if page_num >= len(reader.pages):
+                        continue
+                    thumbnails.append({
+                        "page_number": page_num + 1,
+                        "thumbnail": "",
+                        "width": size[0],
+                        "height": size[1],
+                    })
+                return {
+                    "success": True,
+                    "thumbnails": thumbnails,
+                    "total_pages": len(reader.pages),
+                }
+
+            # 处理每个页面的缩略图
+            for i, page_num in enumerate(page_numbers):
                 if page_num >= len(reader.pages):
                     continue
 
-                page = reader.pages[page_num]
+                if i >= len(images):
+                    continue
 
-                # 使用PIL创建缩略图
-                img_data = self._create_thumbnail(page, size)
+                img = images[i]
 
-                if img_data:
-                    thumbnails.append({
-                        "page_number": page_num + 1,
-                        "thumbnail": img_data["data"],
-                        "width": img_data["width"],
-                        "height": img_data["height"],
-                    })
+                # 使用更高质量的重采样方法缩放图片
+                img_copy = img.copy()
+                img_copy.thumbnail(size, Image.Resampling.LANCZOS)
+
+                # 转换为 base64，移除 optimize 参数以保持更高质量
+                buffer = io.BytesIO()
+                img_copy.save(buffer, format='PNG', quality=95)
+                img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                img_data = f"data:image/png;base64,{img_str}"
+
+                thumbnails.append({
+                    "page_number": page_num + 1,
+                    "thumbnail": img_data,
+                    "width": size[0],
+                    "height": size[1],
+                })
 
             return {
                 "success": True,
@@ -143,15 +181,9 @@ class DocumentMergeConverter:
             # 计算缩略图尺寸
             width, height = size
 
-            # 创建占位图片（白色背景）
-            img = Image.new('RGB', (width, height), color='white')
-
-            # 转换为字节
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
-
+            # 返回空字符串（让前端使用默认文档图标）
             return {
-                "data": img_byte_arr.getvalue(),
+                "data": "",
                 "width": width,
                 "height": height,
                 "original_width": int(page_width),
