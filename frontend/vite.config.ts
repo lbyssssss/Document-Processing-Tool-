@@ -20,4 +20,7 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    allowedHosts: ['.monkeycode-ai.online'],
+  },
 })
