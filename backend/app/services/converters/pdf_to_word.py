@@ -43,10 +43,21 @@ class PDFToWordConverter:
             # 保存Word文档
             doc.save(str(self.output_path))
 
+            # 验证文件是否成功创建
+            if not self.output_path.exists():
+                return {
+                    "success": False,
+                    "error": "输出文件创建失败",
+                }
+
+            # 获取文件大小
+            file_size = self.output_path.stat().st_size
+
             return {
                 "success": True,
                 "page_count": len(reader.pages),
                 "output_file": str(self.output_path),
+                "file_size": file_size,
                 "message": "Word文档生成成功",
             }
 
