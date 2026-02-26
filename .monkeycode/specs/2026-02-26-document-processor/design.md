@@ -5,7 +5,7 @@ Updated: 2026-02-26
 
 ## Description
 
-文档处理工具是一个纯前端应用，支持PDF、Word、Excel、PPT、图片等常见格式的文档转换、检索、批注和页面管理。采用本地部署方式，适用于个人和小团队场景，无需后端服务器支持。
+文档处理工具是一个纯前端应用，支持PDF、Word、Excel、PPT、图片等常见格式的文档转换、检索、批注和页面管理，并提供文档拼接功能。采用本地部署方式，适用于个人和小团队场景，无需后端服务器支持。
 
 ## Architecture
 
@@ -20,6 +20,7 @@ graph TB
         A4[检索面板]
         A5[批注面板]
         A6[页面管理面板]
+        A7[文档拼接视图]
     end
 
     subgraph "Application Layer"
@@ -28,6 +29,7 @@ graph TB
         B3[批注管理服务]
         B4[页面管理服务]
         B5[批量处理服务]
+        B6[文档拼接服务]
     end
 
     subgraph "Domain Layer"
@@ -35,6 +37,7 @@ graph TB
         C2[批注模型]
         C3[页面模型]
         C4[转换配置模型]
+        C5[拼接配置模型]
     end
 
     subgraph "Infrastructure Layer"
@@ -52,6 +55,7 @@ graph TB
     A4 --> B2
     A5 --> B3
     A6 --> B4
+    A7 --> B6
 
     B1 --> C1
     B1 --> C4
@@ -59,6 +63,7 @@ graph TB
     B3 --> C2
     B4 --> C3
     B5 --> C1
+    B6 --> C5
 
     B1 --> D1
     B1 --> D2
@@ -67,6 +72,7 @@ graph TB
     B3 --> D5
     B3 --> D6
     B4 --> D1
+    B6 --> D1
 ```
 
 ### 技术栈选择
@@ -105,6 +111,11 @@ src/
 │   ├── page/              # 页面管理组件
 │   │   ├── PageManager.vue
 │   │   └── PageToolbar.vue
+│   ├── merge/             # 文档拼接组件
+│   │   ├── DocumentMergeView.vue
+│   │   ├── PageSelector.vue
+│   │   ├── MergeQueue.vue
+│   │   └── PageRangeSelector.vue
 │   └── common/            # 通用组件
 │       ├── LoadingSpinner.vue
 │       ├── ProgressBar.vue
@@ -113,21 +124,25 @@ src/
 │   ├── useDocument.ts
 │   ├── useSearch.ts
 │   ├── useAnnotation.ts
-│   └── usePageManagement.ts
+│   ├── usePageManagement.ts
+│   └── useDocumentMerge.ts
 ├── services/              # 服务层
 │   ├── conversion.service.ts
 │   ├── search.service.ts
 │   ├── annotation.service.ts
 │   ├── page.service.ts
-│   └── batch.service.ts
+│   ├── batch.service.ts
+│   └── merge.service.ts
 ├── stores/                # 状态管理
 │   ├── document.store.ts
 │   ├── annotation.store.ts
-│   └── ui.store.ts
+│   ├── ui.store.ts
+│   └── merge.store.ts
 ├── types/                 # 类型定义
 │   ├── document.types.ts
 │   ├── annotation.types.ts
-│   └── conversion.types.ts
+│   ├── conversion.types.ts
+│   └── merge.types.ts
 ├── utils/                 # 工具函数
 │   ├── file.utils.ts
 │   ├── format.utils.ts
@@ -294,6 +309,70 @@ interface PageService {
 }
 ```
 
+### 文档拼接服务 (MergeService)
+
+```typescript
+interface SelectedPage {
+  id: string;
+  documentId: string;
+  pageIndex: number;
+  originalDocumentName: string;
+  thumbnail: string;
+  pageWidth: number;
+  pageHeight: number;
+  rotation: number;
+}
+
+interface MergeConfig {
+  pageSize?: 'A4' | 'A3' | 'Letter' | 'auto';
+  orientation?: 'portrait' | 'landscape' | 'keep-original';
+  outputFileName: string;
+  includeBookmarks?: boolean;
+  metadata?: {
+    title?: string;
+    author?: string;
+    subject?: string;
+  };
+}
+
+interface MergeResult {
+  success: boolean;
+  outputBlob: Blob | null;
+  totalPages: number;
+  warnings: string[];
+  error?: string;
+}
+
+interface MergeService {
+  // 选择页面
+  selectPage(selectedPage: SelectedPage): void;
+
+  // 取消选择页面
+  deselectPage(pageId: string): void;
+
+  // 批量选择页面范围
+  selectPageRange(documentId: string, startIndex: number, endIndex: number): void;
+
+  // 全选/取消全选文档的所有页面
+  toggleAllPages(documentId: string): void;
+
+  // 调整拼接队列中页面顺序
+  reorderPage(pageId: string, newIndex: number): void;
+
+  // 清空拼接队列
+  clearQueue(): void;
+
+  // 获取当前拼接队列
+  getQueue(): SelectedPage[];
+
+  // 生成合并后的PDF
+  mergeDocuments(config: MergeConfig): Promise<MergeResult>;
+
+  // 预览合并结果
+  previewMerge(): Promise<string[]>;
+}
+```
+
 ## Data Models
 
 ### 文档模型
@@ -386,6 +465,39 @@ interface PageElement {
 }
 ```
 
+### 拼接配置模型
+
+```typescript
+interface MergeConfig {
+  pageSize: 'A4' | 'A3' | 'Letter' | 'auto';
+  orientation: 'portrait' | 'landscape' | 'keep-original';
+  outputFileName: string;
+  includeBookmarks: boolean;
+  metadata?: {
+    title?: string;
+    author?: string;
+    subject?: string;
+  };
+}
+
+interface SelectedPage {
+  id: string;
+  documentId: string;
+  pageIndex: number;
+  originalDocumentName: string;
+  thumbnail: string;
+  pageWidth: number;
+  pageHeight: number;
+  rotation: number;
+}
+
+interface MergeQueue {
+  pages: SelectedPage[];
+  totalCount: number;
+  documents: Set<string>;
+}
+```
+
 ## Correctness Properties
 
 ### 文档转换正确性
@@ -419,6 +531,15 @@ interface PageElement {
 1. **索引一致性**: 页面操作后的页面索引必须连续且唯一
 2. **内容完整性**: 页面移动、旋转操作不得改变页面内容
 3. **合并逻辑**: 合并多个页面时，所有源页面的内容必须出现在结果页面中
+
+### 文档拼接正确性
+
+1. **页面顺序保持性**: 拼接结果中的页面顺序必须与用户在拼接队列中定义的顺序完全一致
+2. **内容完整性**: 所有选中的页面内容必须完整出现在结果文档中，不得有遗漏或重复
+3. **跨文档正确性**: 来自不同文档的页面能够正确合并到同一文档中
+4. **页面尺寸处理**: 根据配置正确处理不同尺寸的页面（统一尺寸或保持原尺寸）
+5. **方向一致性**: 根据配置正确处理不同方向的页面
+6. **元数据准确性**: 生成的PDF元数据必须与用户配置一致
 
 ## Error Handling
 
@@ -465,6 +586,17 @@ interface PageElement {
 | 页面合并冲突 | 检测到冲突时提示用户选择操作方式 |
 | 缩略图生成失败 | 显示默认图标，记录错误日志 |
 
+### 文档拼接错误
+
+| 错误类型 | 处理策略 |
+|---------|---------|
+| 拼接队列为空 | 禁用生成按钮，提示用户选择页面 |
+| 页面加载失败 | 标记失败页面，继续处理其他页面，生成警告报告 |
+| 文档格式不兼容 | 自动转换非PDF文档为PDF后继续，或提示用户手动转换 |
+| 内存不足 | 显示"内存不足"提示，建议减少拼接页面数量或分批处理 |
+| 生成失败 | 显示具体错误信息，提供重试选项 |
+| 页面尺寸差异 | 显示警告信息，说明将使用统一尺寸处理 |
+
 ## Test Strategy
 
 ### 单元测试
@@ -474,12 +606,14 @@ interface PageElement {
 3. **检索算法测试**: 验证检索结果的准确性和完整性
 4. **批注操作测试**: 验证批注的增删改查功能正确性
 5. **页面操作测试**: 验证页面插入、删除、移动、旋转等操作的正确性
+6. **文档拼接测试**: 验证页面选择、排序、合并功能的正确性
 
 ### 集成测试
 
 1. **端到端转换测试**: 完整测试从文件上传到转换结果导出的全流程
 2. **批量处理测试**: 验证批量转换的并发处理和错误隔离
 3. **存储持久化测试**: 验证应用状态在刷新后的恢复能力
+4. **跨文档拼接测试**: 验证从多个文档选择页面并合并的完整流程
 
 ### 兼容性测试
 
@@ -550,13 +684,22 @@ interface PageElement {
 3. 拖拽排序功能
 4. 页面旋转、删除等操作
 
-### 阶段七：批量处理
+### 阶段七：文档拼接功能
+
+1. 文档拼接视图开发
+2. 页面选择器组件
+3. 拼接队列组件
+4. 页面范围选择器
+5. 拖拽排序功能
+6. 文档合并逻辑实现
+
+### 阶段八：批量处理
 
 1. 批量转换逻辑
 2. 进度显示
 3. 结果报告
 
-### 阶段八：优化与完善
+### 阶段九：优化与完善
 
 1. 性能优化
 2. 错误处理完善
