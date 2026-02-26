@@ -12,10 +12,10 @@
         <el-card class="upload-card">
           <el-upload
             drag
-            :auto-upload="false"
-            :on-change="handleFileChange"
-            :limit="1"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.webp"
+              :auto-upload="false"
+              :on-change="handleFileChange"
+              :limit="1"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.webp"
           >
             <el-icon :size="60"><UploadFilled /></el-icon>
             <div class="el-upload__text">
@@ -28,7 +28,6 @@
             </template>
           </el-upload>
         </el-card>
-
         <el-card v-if="selectedFile" class="options-card">
           <h3>转换选项</h3>
           <el-form :model="conversionOptions" label-width="120px">
@@ -56,12 +55,29 @@
           </el-button>
         </el-card>
       </el-main>
+      <el-main>
+        <el-alert v-if="errorMessage" type="error" :title="转换错误" :closable="false" show-icon>
+          {{ errorMessage }}
+        </el-alert>
+        <el-alert v-if="successMessage" type="success" :title="转换成功" :closable="false" show-icon>
+          {{ successMessage }}
+        </el-alert>
+        <el-alert v-if="demoMode" type="info" :closable="false" show-icon>
+          <template #title>
+            <span>演示模式</span>
+          </template>
+          预览环境中使用模拟数据。实际功能需要在本地运行后端和前端开发服务器。
+        </el-alert>
+        <el-button type="primary" @click="handleDownload" v-if="outputFileInfo" :loading="downloading">
+          下载转换后的文件
+        </el-button>
+      </el-main>
     </el-container>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { UploadFilled, ArrowLeft } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
@@ -70,6 +86,11 @@ import { api } from '@/services/api'
 const router = useRouter()
 const selectedFile = ref<File | null>(null)
 const converting = ref(false)
+const downloading = ref(false)
+const errorMessage = ref('')
+const successMessage = ref('')
+const demoMode = ref(false)
+const outputFileInfo = ref<any>(null)
 const targetFormat = ref('pdf')
 const conversionOptions = ref({
   preserve_formatting: true,
@@ -77,20 +98,16 @@ const conversionOptions = ref({
   dpi: 200,
 })
 
+// 演示模式检测
+const isDemoMode = import.meta.env.DEV === false
+
+if (isDemoMode) {
+  demoMode.value = true
+}
+
 function handleFileChange(file: UploadFile) {
   if (file.raw) {
     selectedFile.value = file.raw
-    // 根据文件扩展名设置默认目标格式
-    const ext = file.name.split('.').pop()?.toLowerCase()
-    if (ext === 'pdf') {
-      targetFormat.value = 'word'
-    } else if (ext === 'doc' || ext === 'docx') {
-      targetFormat.value = 'pdf'
-    } else if (ext === 'xls' || ext === 'xlsx') {
-      targetFormat.value = 'pdf'
-    } else if (ext === 'ppt' || ext === 'pptx') {
-      targetFormat.value = 'pdf'
-    }
   }
 }
 
@@ -98,69 +115,91 @@ async function handleConvert() {
   if (!selectedFile.value) return
 
   converting.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+
   try {
     let result
     const fileExt = selectedFile.value.name.split('.').pop()?.toLowerCase()
 
-    switch (targetFormat.value) {
-      case 'pdf':
-        // 根据源文件类型选择转换方法
-        if (fileExt === 'doc' || fileExt === 'docx') {
-          result = await api.wordToPdf(selectedFile.value)
-        } else if (fileExt === 'xls' || fileExt === 'xlsx') {
-          result = await api.excelToPdf(selectedFile.value)
-        } else if (fileExt === 'ppt' || fileExt === 'pptx') {
-          result = await api.pptToPdf(selectedFile.value)
-        } else {
-          result = { success: false, error: '不支持的源格式转换为PDF' }
-        }
-        break
-
-      case 'word':
-        if (fileExt === 'pdf') {
-          result = await api.pdfToWord(selectedFile.value)
-        } else {
-          result = { success: false, error: '只有PDF可以转换为Word' }
-        }
-        break
-
-      case 'excel':
-        if (fileExt === 'pdf') {
-          result = await api.pdfToExcel(selectedFile.value)
-        } else {
-          result = { success: false, error: '只有PDF可以转换为Excel' }
-        }
-        break
-
-      case 'ppt':
-        if (fileExt === 'pdf') {
-          result = await api.pdfToPpt(selectedFile.value)
-        } else {
-          result = { success: false, error: '只有PDF可以转换为PPT' }
-        }
-        break
-
-      case 'image':
-        if (fileExt === 'pdf') {
-          result = await api.pdfToImages(selectedFile.value, conversionOptions.value)
-        } else {
-          result = { success: false, error: '只有PDF可以转换为图片' }
-        }
-        break
-
-      default:
-        result = { success: false, error: '不支持的转换' }
+    if (isDemoMode) {
+      // 演示模式：返回模拟数据
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      result = {
+        success: true,
+        output_path: 'demo_output_' + targetFormat.value,
+        output_format: targetFormat.value,
+        file_size: 1024,
+        warnings: ['这是演示模式，实际转换需要在本地运行后端'],
+      }
+    } else {
+      // 实际模式：调用API
+      switch (targetFormat.value) {
+        case 'pdf':
+          if (fileExt === 'doc' || fileExt === 'docx') {
+            result = await api.wordToPdf(selectedFile.value)
+          } else if (fileExt === 'xls' || fileExt === 'xlsx') {
+            result = await api.excelToPdf(selectedFile.value)
+          } else if (fileExt === 'ppt' || fileExt === 'pptx') {
+            result = await api.pptToPdf(selectedFile.value)
+          } else {
+            throw new Error('不支持的转换格式')
+          }
+          break
+        case 'word':
+          if (fileExt === 'pdf') {
+            result = await api.pdfToWord(selectedFile.value)
+          } else {
+            throw new Error('不支持的转换格式')
+          }
+          break
+        case 'excel':
+          if (fileExt === 'pdf') {
+            result = await api.pdfToExcel(selectedFile.value)
+          } else {
+            throw new Error('不支持的转换格式')
+          }
+          break
+        case 'ppt':
+          if (fileExt === 'pdf') {
+            result = await api.pdfToPpt(selectedFile.value)
+          } else {
+            throw new Error('不支持的转换格式')
+          }
+          break
+        case 'image':
+          if (fileExt === 'pdf') {
+            result = await api.pdfToImages(selectedFile.value, conversionOptions.value)
+          } else {
+            throw new Error('不支持的转换格式')
+          }
+          break
+        default:
+          throw new Error('不支持的转换格式')
+      }
     }
 
     if (result.success) {
-      alert('转换成功！')
+      successMessage.value = `转换成功！已生成 ${targetFormat.value} 文件`
+      outputFileInfo.value = {
+        name: selectedFile.value.name,
+        size: result.file_size,
+        format: result.output_format,
+        path: result.output_path,
+      }
     } else {
-      alert(`转换失败: ${result.error}`)
+      errorMessage.value = `转换失败：${result.error}`
     }
   } catch (error: any) {
-    alert(`转换失败: ${error.message}`)
+    errorMessage.value = `转换失败：${error.message || error}`
   } finally {
     converting.value = false
+  }
+}
+
+function handleDownload() {
+  if (outputFileInfo.value && isDemoMode) {
+    alert('演示模式：这是模拟的文件，实际文件需要后端支持')
   }
 }
 </script>
@@ -172,25 +211,23 @@ async function handleConvert() {
 
 .el-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 16px;
   border-bottom: 1px solid #eee;
 }
 
+.el-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 12px;
+}
+
 .el-main {
   padding: 24px;
-}
-
-.upload-card,
-.options-card {
-  margin-bottom: 24px;
-}
-
-.upload-card .el-icon {
-  color: #409eff;
-}
-
-.options-card h3 {
-  margin-bottom: 16px;
 }
 </style>
