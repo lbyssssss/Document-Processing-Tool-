@@ -38,6 +38,11 @@
               <h3>文档拼接</h3>
               <p>将多个文档的指定页面合并为一个新文档</p>
             </el-card>
+            <el-card class="feature-item" shadow="hover" @click="$router.push('/status')">
+              <el-icon :size="40"><InfoFilled /></el-icon>
+              <h3>部署状态</h3>
+              <p>查看当前部署环境和说明</p>
+            </el-card>
           </div>
         </el-card>
       </el-main>
@@ -46,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { Document, Search, Edit, Memo, Link } from '@element-plus/icons-vue'
+import { Document, Search, Edit, Memo, Link, InfoFilled } from '@element-plus/icons-vue'
 </script>
 
 <style scoped>

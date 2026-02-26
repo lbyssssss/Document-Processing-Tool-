@@ -16,6 +16,11 @@ const routes: RouteRecordRaw[] = [
     name: 'Merge',
     component: () => import('@/views/MergeView.vue'),
   },
+  {
+    path: '/status',
+    name: 'Status',
+    component: () => import('@/views/status/StatusView.vue'),
+  },
 ]
 
 const router = createRouter({
