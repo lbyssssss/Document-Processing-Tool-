@@ -216,3 +216,25 @@ async def get_document_pages(document_id: str):
             raise HTTPException(status_code=404, detail=error_msg)
         else:
             raise HTTPException(status_code=500, detail=error_msg)
+
+
+@router.get("/merge/download/{filename}")
+async def download_merged_file(filename: str):
+    """下载合并后的PDF文件"""
+    try:
+        from fastapi.responses import FileResponse
+
+        file_path = Path(settings.output_dir) / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail=f"文件 {filename} 不存在")
+
+        return FileResponse(
+            path=str(file_path),
+            filename=filename,
+            media_type='application/pdf'
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

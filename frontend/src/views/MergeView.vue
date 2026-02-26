@@ -293,6 +293,17 @@ async function handleMerge() {
     const result = await api.mergeDocuments(config)
     if (result.success) {
       ElMessage.success(`合并成功！共 ${result.total_pages} 页`)
+      // 自动下载合并后的文件
+      if (result.output_path) {
+        // 从 output_path 中提取文件名（移除任何路径前缀）
+        const filename = result.output_path.replace(/^.*[\/\\]/, '')
+        // 使用后端 API 下载
+        const downloadUrl = `/api/v1/merge/download/${filename}`
+        const link = document.createElement('a')
+        link.href = downloadUrl
+        link.download = filename
+        link.click()
+      }
     } else {
       ElMessage.error(`合并失败：${result.error}`)
     }
