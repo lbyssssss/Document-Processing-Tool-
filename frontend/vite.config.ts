@@ -14,13 +14,13 @@ export default defineConfig({
     port: 5173,
     allowedHosts: ['.monkeycode-ai.online'],
     proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
+      '/api/v1': {
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         timeout: 300000,
         configure: (proxy, _options) => {
           proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log(`Proxying: ${req.method} ${req.url} -> http://localhost:3001${req.url}`)
+            console.log(`Proxying: ${req.method} ${req.url} -> http://127.0.0.1:3001${req.url}`)
           })
           proxy.on('proxyRes', (proxyRes, req, _res) => {
             console.log(`Proxy response: ${req.method} ${req.url} -> Status: ${proxyRes.statusCode}`)
