@@ -163,6 +163,18 @@ async function handleConvert() {
     }
 
     if (result.success) {
+      // 提供下载链接
+      if (result.output_path) {
+        // 构建下载URL
+        const downloadUrl = `/api/v1/conversion/download/${encodeURIComponent(result.output_path)}`
+        // 创建下载链接
+        const link = document.createElement('a')
+        link.href = downloadUrl
+        link.download = result.output_path.split('/').pop() || 'converted_file'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
       alert('转换成功！')
       // 清空选择
       selectedFiles.value = []
