@@ -15,10 +15,20 @@
             <el-card class="document-list-card">
               <template #header>
                 <span>上传文档</span>
-                <el-button size="small" type="primary" @click="showUploadDialog = true">
-                  <el-icon><Plus /></el-icon>
-                  添加文档
-                </el-button>
+                <el-upload
+                  :auto-upload="true"
+                  :show-file-list="false"
+                  :on-success="handleUploadSuccess"
+                  :on-error="handleUploadError"
+                  :before-upload="beforeUpload"
+                  accept=".pdf"
+                  :action="uploadAction"
+                >
+                  <el-button size="small" type="primary">
+                    <el-icon><Plus /></el-icon>
+                    添加文档
+                  </el-button>
+                </el-upload>
               </template>
 
               <el-tabs v-model="activeDocumentId">
@@ -103,11 +113,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Plus, Delete, CircleCheckFilled } from '@element-plus/icons-vue'
 import { useMergeStore } from '@/stores/merge'
 import { api } from '@/services/api'
+import { ElMessage } from 'element-plus'
+import type { UploadFile, UploadProps } from 'element-plus'
 import type { SelectedPage } from '@/stores/merge'
 
 const router = useRouter()
@@ -115,11 +127,74 @@ const mergeStore = useMergeStore()
 const queue = computed(() => mergeStore.queue)
 
 const activeDocumentId = ref('')
-const showUploadDialog = ref(false)
+const uploading = ref(false)
 const merging = ref(false)
+const uploadAction = ref('')
 
 // 模拟文档数据
 const documents = ref<any[]>([])
+
+// 设置上传地址
+onMounted(() => {
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+  uploadAction.value = `${baseURL}/merge/upload-document`
+})
+
+async function handleUploadSuccess(response: any, file: UploadFile) {
+  ElMessage.success('文档上传成功')
+  const docId = response.document_id
+  
+  // 加载文档页面
+  await loadDocumentPages(docId, file.name)
+}
+
+function handleUploadError(error: any) {
+  ElMessage.error(`文档上传失败: ${error.message}`)
+}
+
+function beforeUpload(file: UploadFile) {
+  const isPDF = file.type === 'application/pdf'
+  const isLt100M = (file.size || 0) / 1024 / 1024 < 100
+
+  if (!isPDF) {
+    ElMessage.error('只能上传PDF文件!')
+    return false
+  }
+  if (!isLt100M) {
+    ElMessage.error('文件大小不能超过100MB!')
+    return false
+  }
+  return true
+}
+
+async function loadDocumentPages(documentId: string, fileName: string) {
+  try {
+    const result = await api.getDocumentPages(documentId)
+    if (result.success) {
+      // 添加到文档列表
+      const pages = result.pages.map((page: any) => ({
+        page_number: page.page_number,
+        width: page.width,
+        height: page.height,
+        rotation: page.rotation,
+        thumbnail: page.thumbnail,
+      }))
+      
+      documents.value.push({
+        id: documentId,
+        name: fileName || `文档${documentId}`,
+        pages: pages,
+      })
+      
+      // 自动激活第一个文档
+      if (documents.value.length === 1) {
+        activeDocumentId.value = documentId
+      }
+    }
+  } catch (error: any) {
+    ElMessage.error(`加载文档页面失败: ${error.message}`)
+  }
+}
 
 function isPageSelected(docId: string, pageIndex: number): boolean {
   return queue.value.some(

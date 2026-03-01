@@ -2,6 +2,7 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
+import uuid
 
 
 class Rectangle(BaseModel):
@@ -12,12 +13,12 @@ class Rectangle(BaseModel):
 
 
 class Annotation(BaseModel):
-    id: str = Field(default_factory=lambda: "anno_" + str(hash(None)))
+    id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
     document_id: str
     page_index: int
     position: Rectangle
     content: str
-    author: str
+    author: str = "anonymous"
     color: str = "#FF5722"
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: Optional[datetime] = Field(default_factory=datetime.now)
+    updated_at: Optional[datetime] = Field(default_factory=datetime.now)
