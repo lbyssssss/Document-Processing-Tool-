@@ -51,6 +51,17 @@
                 <el-radio value="ppt">PPT</el-radio>
               </el-radio-group>
             </el-form-item>
+            <el-form-item v-if="targetFormat === 'image' && imageOutputFormat === 'ppt'" label="转换模式">
+              <el-radio-group v-model="conversionOptions.ocr_mode">
+                <el-radio :value="false">直接插入图片</el-radio>
+                <el-radio :value="true">OCR识别文字</el-radio>
+              </el-radio-group>
+              <template #help>
+                <div style="font-size: 12px; color: #909399;">
+                  OCR识别会将图片中的文字提取出来，重新写入PPT中
+                </div>
+              </template>
+            </el-form-item>
             <el-form-item v-if="targetFormat === 'image'" label="输出质量">
               <el-slider v-model="conversionOptions.quality" :min="1" :max="100" />
             </el-form-item>
@@ -83,6 +94,7 @@ const conversionOptions = ref({
   preserve_formatting: true,
   quality: 90,
   dpi: 200,
+  ocr_mode: false,
 })
 
 function handleFileChange(file: UploadFile) {
@@ -124,7 +136,7 @@ async function handleConvert() {
       if (imageOutputFormat.value === 'pdf') {
         result = await api.imagesToPdf(files, conversionOptions.value)
       } else {
-        result = await api.imagesToPpt(files)
+        result = await api.imagesToPpt(files, conversionOptions.value)
       }
     } else if (targetFormat.value === 'pdf') {
       // 转为PDF

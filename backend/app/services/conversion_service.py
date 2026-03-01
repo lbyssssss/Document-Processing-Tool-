@@ -32,6 +32,7 @@ class ConversionOptions:
         dpi: Optional[int] = None,
         page_size: Optional[str] = None,
         orientation: Optional[str] = None,
+        ocr_mode: bool = False,
     ):
         self.preserve_formatting = preserve_formatting
         self.quality = quality
@@ -40,6 +41,7 @@ class ConversionOptions:
         self.dpi = dpi
         self.page_size = page_size
         self.orientation = orientation
+        self.ocr_mode = ocr_mode
 
 
 class ConversionResult:
@@ -339,7 +341,7 @@ class ConversionService:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_path = self.output_dir / f"images_{timestamp}.pptx"
 
-            converter = ImagesToPPTConverter(files, output_path)
+            converter = ImagesToPPTConverter(files, output_path, ocr_mode=options.ocr_mode)
             result = converter.convert()
 
             if not result.get("success"):

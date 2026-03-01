@@ -103,6 +103,7 @@ export const api = {
   async imagesToPpt(files: File[], options?: any) {
     const formData = new FormData()
     files.forEach(file => formData.append('files', file))
+    if (options?.ocr_mode !== undefined) formData.append('ocr_mode', options.ocr_mode ? 'true' : 'false')
     const res = await apiClient.post('/conversion/images-to-ppt', formData)
     return res.data
   },

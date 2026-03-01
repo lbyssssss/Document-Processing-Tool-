@@ -31,6 +31,7 @@ class ConversionOptionsPydantic(BaseModel):
     dpi: Optional[int] = None
     page_size: Optional[str] = None
     orientation: Optional[str] = None
+    ocr_mode: bool = False
 
 
 class ConversionResultPydantic(BaseModel):
@@ -300,10 +301,11 @@ async def images_to_ppt(
     files: List[UploadFile] = File(...),
     preserve_formatting: bool = Form(True),
     quality: Optional[int] = Form(None),
+    ocr_mode: bool = Form(False),
 ):
     """图片转PPT"""
     try:
-        logger.info(f"收到图片转PPT请求，文件数量: {len(files)}")
+        logger.info(f"收到图片转PPT请求，文件数量: {len(files)}, OCR模式: {ocr_mode}")
         saved_files = []
         for file in files:
             logger.info(f"处理文件: {file.filename}, content_type: {file.content_type}")
@@ -316,6 +318,7 @@ async def images_to_ppt(
         service_options = ConversionOptions(
             preserve_formatting=preserve_formatting,
             quality=quality,
+            ocr_mode=ocr_mode,
         )
 
         result = await conversion_service.images_to_ppt(saved_files, service_options)
