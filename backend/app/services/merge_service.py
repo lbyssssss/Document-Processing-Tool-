@@ -295,6 +295,9 @@ class MergeService:
                 error="队列为空",
             )
 
+        import logging
+        logger = logging.getLogger(__name__)
+
         try:
             # 按文档ID分组
             doc_pages = {}
@@ -349,6 +352,9 @@ class MergeService:
             )
 
         except Exception as e:
+            import traceback
+            logger.error(f"Merge failed: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
             return MergeResult(
                 success=False,
                 total_pages=0,

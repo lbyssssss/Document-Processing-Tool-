@@ -53,9 +53,13 @@ class DocumentMergeConverter:
                 if orientation == "keep-original":
                     merged_page = page
                 elif orientation == "portrait":
-                    merged_page = page.rotate(0)
+                    # rotate()返回字典，需要从中提取PageObject
+                    rotated = page.rotate(0)
+                    merged_page = rotated["/Type"]
                 elif orientation == "landscape":
-                    merged_page = page.rotate(90)
+                    # rotate()返回字典，需要从中提取PageObject
+                    rotated = page.rotate(90)
+                    merged_page = rotated["/Type"]
 
                 # 如果需要统一页面尺寸，需要添加到标准尺寸的页面
                 if page_size != "auto":
