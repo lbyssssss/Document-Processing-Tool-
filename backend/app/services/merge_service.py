@@ -301,14 +301,20 @@ class MergeService:
         try:
             # 按文档ID分组
             doc_pages = {}
+            doc_id_to_index = {}  # document_id -> index in pdf_files
+            doc_index = 0
+
             for page in self._queue:
                 if page.document_id not in doc_pages:
                     doc_pages[page.document_id] = []
-                doc_pages[page.document_id].append((page.document_id, page.page_index))
+                    doc_id_to_index[page.document_id] = doc_index
+                    doc_index += 1
+                doc_pages[page.document_id].append(page.page_index)
 
-            # 收集所有PDF文件路径
+            # 收集所有PDF文件路径（按出现顺序）
             pdf_files = []
-            for doc_id, pages in doc_pages.items():
+            doc_ids_in_order = list(doc_id_to_index.keys())
+            for doc_id in doc_ids_in_order:
                 doc_info = self._documents.get(doc_id)
                 if doc_info and Path(doc_info["path"]).exists():
                     pdf_files.append(Path(doc_info["path"]))
@@ -323,7 +329,8 @@ class MergeService:
             # 按队列顺序排序页面
             sorted_pages = []
             for page in self._queue:
-                sorted_pages.append((page.document_id, page.page_index))
+                doc_idx = doc_id_to_index.get(page.document_id, 0)
+                sorted_pages.append((doc_idx, page.page_index))
 
             # 生成输出文件路径
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
