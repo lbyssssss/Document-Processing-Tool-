@@ -248,6 +248,20 @@ export const api = {
     return res.data
   },
 
+  async uploadDocumentsBatch(files: File[]) {
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+    const res = await apiClient.post('/merge/upload-documents-batch', formData)
+    return res.data
+  },
+
+  async downloadMergedFile(filename: string) {
+    const res = await apiClient.get(`/merge/download/${filename}`, {
+      responseType: 'blob',
+    })
+    return res
+  },
+
   async selectPage(page: any) {
     const res = await apiClient.post('/merge/select-page', page)
     return res.data

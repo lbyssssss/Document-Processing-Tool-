@@ -1,5 +1,6 @@
 # Merge API
 from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from pathlib import Path
@@ -131,6 +132,86 @@ async def upload_document(file: UploadFile = File(...)):
     }
 
 
+@router.post("/merge/upload-documents-batch")
+async def upload_documents_batch(files: List[UploadFile] = File(...)):
+    """批量上传文档用于合并"""
+    import uuid
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    if not files:
+        raise HTTPException(status_code=400, detail="未选择文件")
+
+    results = []
+
+    for file in files:
+        try:
+            # 验证文件类型
+            if not file.filename:
+                results.append({
+                    "success": False,
+                    "filename": "unknown",
+                    "error": "文件名不能为空",
+                })
+                continue
+
+            filename_lower = file.filename.lower()
+            if not filename_lower.endswith('.pdf'):
+                results.append({
+                    "success": False,
+                    "filename": file.filename,
+                    "error": "只支持PDF格式文件",
+                })
+                continue
+
+            # 生成文档ID
+            doc_id = str(uuid.uuid4())
+
+            # 目标路径
+            target_filename = f"{doc_id}.pdf"
+            target_path = Path(settings.upload_dir) / target_filename
+
+            # 确保上传目录存在
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # 保存上传的文件
+            with open(target_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            # 注册文档信息到merge_service
+            merge_service._documents[doc_id] = {
+                "id": doc_id,
+                "name": file.filename,
+                "path": str(target_path),
+            }
+
+            results.append({
+                "success": True,
+                "document_id": doc_id,
+                "filename": file.filename,
+                "status": "uploaded",
+            })
+
+            logger.info(f"Uploaded file: {file.filename}, document_id: {doc_id}")
+
+        except Exception as e:
+            logger.error(f"Error uploading file {file.filename}: {e}")
+            results.append({
+                "success": False,
+                "filename": file.filename if file.filename else "unknown",
+                "error": str(e),
+            })
+
+    return {
+        "success": True,
+        "total": len(files),
+        "uploaded": sum(1 for r in results if r["success"]),
+        "failed": sum(1 for r in results if not r["success"]),
+        "results": results,
+    }
+
+
 @router.post("/merge/select-page")
 async def select_page(page: SelectedPagePydantic):
     """选择页面添加到拼接队列"""
@@ -224,3 +305,25 @@ async def get_document_pages(document_id: str):
         return result
     else:
         raise HTTPException(status_code=500, detail=result.get("error", "Unknown error"))
+
+
+@router.get("/merge/download/{filename}")
+async def download_merged_file(filename: str):
+    """下载合并后的PDF文件"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # 构建文件路径
+    file_path = Path(settings.output_dir) / filename
+
+    # 检查文件是否存在
+    if not file_path.exists():
+        logger.error(f"File not found: {file_path}")
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    # 返回文件
+    return FileResponse(
+        path=str(file_path),
+        filename=filename,
+        media_type="application/pdf",
+    )

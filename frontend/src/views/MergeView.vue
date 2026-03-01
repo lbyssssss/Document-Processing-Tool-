@@ -17,7 +17,8 @@
             :on-change="handleFileUpload"
             :file-list="uploadFileList"
             accept=".pdf"
-            :limit="1"
+            :limit="10"
+            multiple
           >
             <el-icon :size="60"><UploadFilled /></el-icon>
             <div class="el-upload__text">
@@ -25,7 +26,7 @@
             </div>
             <template #tip>
               <div class="el-upload__tip">
-                只支持PDF格式
+                只支持PDF格式，可批量上传多个文件
               </div>
             </template>
           </el-upload>
@@ -121,10 +122,35 @@
                 >
                   生成合并文档
                 </el-button>
+                <el-button
+                  v-if="mergedFileInfo"
+                  type="success"
+                  @click="handleDownload"
+                >
+                  <el-icon><Download /></el-icon>
+                  下载合并文档
+                </el-button>
               </div>
             </el-card>
           </el-col>
         </el-row>
+
+        <!-- 合并成功提示 -->
+        <el-dialog v-model="showMergeSuccessDialog" title="合并成功" width="400px">
+          <div class="merge-success-content">
+            <el-icon :size="50" color="#67c23a"><SuccessFilled /></el-icon>
+            <p>文档已成功合并！</p>
+            <p class="file-info">{{ mergedFileInfo?.filename }}</p>
+            <p class="page-info">共 {{ mergedFileInfo?.totalPages }} 页</p>
+          </div>
+          <template #footer>
+            <el-button @click="showMergeSuccessDialog = false">关闭</el-button>
+            <el-button type="primary" @click="handleDownload">
+              <el-icon><Download /></el-icon>
+              下载文件
+            </el-button>
+          </template>
+        </el-dialog>
       </el-main>
     </el-container>
   </div>
@@ -133,7 +159,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Plus, Delete, CircleCheckFilled, UploadFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Delete, CircleCheckFilled, UploadFilled, Download, SuccessFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useMergeStore } from '@/stores/merge'
 import { api } from '@/services/api'
@@ -150,9 +176,13 @@ const merging = ref(false)
 const uploadFileList = ref<UploadFile[]>([])
 const uploading = ref(false)
 
+// 合并成功相关
+const showMergeSuccessDialog = ref(false)
+const mergedFileInfo = ref<{ filename: string; totalPages: number } | null>(null)
+
 // 模拟文档数据
 const documents = ref<any[]>([])
-const tempUploadFile = ref<File | null>(null)
+const tempUploadFiles = ref<File[]>([])
 
 function isPageSelected(docId: string, pageIndex: number): boolean {
   return queue.value.some(
@@ -200,6 +230,12 @@ async function handleMerge() {
     const config = mergeStore.config
     const result = await api.mergeDocuments(config)
     if (result.success) {
+      const filename = result.output_path?.split('/').pop() || 'merged.pdf'
+      mergedFileInfo.value = {
+        filename,
+        totalPages: result.total_pages
+      }
+      showMergeSuccessDialog.value = true
       ElMessage.success('合并成功！')
     } else {
       ElMessage.error(`合并失败: ${result.error}`)
@@ -211,48 +247,111 @@ async function handleMerge() {
   }
 }
 
+async function handleDownload() {
+  if (!mergedFileInfo.value) {
+    ElMessage.warning('请先合并文档')
+    return
+  }
+
+  try {
+    const response = await api.downloadMergedFile(mergedFileInfo.value.filename)
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', mergedFileInfo.value.filename)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error: any) {
+    ElMessage.error(`下载失败: ${error.message}`)
+  }
+}
+
 async function handleFileUpload(file: UploadFile) {
   if (file.raw) {
-    tempUploadFile.value = file.raw
-    uploadFileList.value = [file]
+    tempUploadFiles.value.push(file.raw)
+    uploadFileList.value.push(file)
   }
 }
 
 async function confirmUpload() {
-  if (!tempUploadFile.value) {
+  if (tempUploadFiles.value.length === 0) {
     ElMessage.warning('请先选择文件')
     return
   }
 
   uploading.value = true
   try {
-    // 上传文件到后端
-    const result = await api.uploadDocument(tempUploadFile.value)
+    const files = tempUploadFiles.value
 
-    // 获取文档页面信息
-    const pagesResult = await api.getDocumentPages(result.document_id)
+    if (files.length === 1) {
+      // 单文件上传
+      const result = await api.uploadDocument(files[0])
 
-    if (pagesResult.success) {
-      // 生成页面缩略图数据（使用占位图）
-      const docData = {
-        id: result.document_id,
-        name: result.filename,
-        pages: pagesResult.pages.map((p: any, index: number) => ({
-          index: p.page_number,
-          width: p.width,
-          height: p.height,
-          rotation: p.rotation,
-          thumbnail: p.thumbnail || `data:image/svg+xml;base64,${generatePlaceholderThumbnail(p.width, p.height)}`,
-        })),
+      // 获取文档页面信息
+      const pagesResult = await api.getDocumentPages(result.document_id)
+
+      if (pagesResult.success) {
+        const docData = {
+          id: result.document_id,
+          name: result.filename,
+          pages: pagesResult.pages.map((p: any, index: number) => ({
+            index: p.page_number,
+            width: p.width,
+            height: p.height,
+            rotation: p.rotation,
+            thumbnail: p.thumbnail || `data:image/svg+xml;base64,${generatePlaceholderThumbnail(p.width, p.height)}`,
+          })),
+        }
+
+        documents.value.push(docData)
+        activeDocumentId.value = result.document_id
+        ElMessage.success('文档上传成功')
+      }
+    } else {
+      // 批量上传
+      const result = await api.uploadDocumentsBatch(files)
+
+      const uploadedDocs = result.results.filter((r: any) => r.success)
+      const failedDocs = result.results.filter((r: any) => !r.success)
+
+      if (failedDocs.length > 0) {
+        ElMessage.warning(`${uploadedDocs.length} 个文件上传成功，${failedDocs.length} 个失败`)
+      } else {
+        ElMessage.success(`成功上传 ${uploadedDocs.length} 个文档`)
       }
 
-      documents.value.push(docData)
-      activeDocumentId.value = result.document_id
-      showUploadDialog.value = false
-      uploadFileList.value = []
-      tempUploadFile.value = null
-      ElMessage.success('文档上传成功')
+      // 为每个成功上传的文档获取页面信息
+      for (const docResult of uploadedDocs) {
+        try {
+          const pagesResult = await api.getDocumentPages(docResult.document_id)
+          if (pagesResult.success) {
+            const docData = {
+              id: docResult.document_id,
+              name: docResult.filename,
+              pages: pagesResult.pages.map((p: any, index: number) => ({
+                index: p.page_number,
+                width: p.width,
+                height: p.height,
+                rotation: p.rotation,
+                thumbnail: p.thumbnail || `data:image/svg+xml;base64,${generatePlaceholderThumbnail(p.width, p.height)}`,
+              })),
+            }
+            documents.value.push(docData)
+            if (!activeDocumentId.value) {
+              activeDocumentId.value = docResult.document_id
+            }
+          }
+        } catch (error: any) {
+          console.error(`获取文档 ${docResult.filename} 页面信息失败:`, error)
+        }
+      }
     }
+
+    showUploadDialog.value = false
+    uploadFileList.value = []
+    tempUploadFiles.value = []
   } catch (error: any) {
     ElMessage.error(`上传文档失败: ${error.message}`)
   } finally {
@@ -377,5 +476,27 @@ function generatePlaceholderThumbnail(width: number, height: number): string {
 
 .queue-actions .el-button {
   flex: 1;
+}
+
+.merge-success-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0;
+}
+
+.merge-success-content .file-info {
+  font-weight: bold;
+  font-size: 16px;
+  color: #303133;
+  word-break: break-all;
+  text-align: center;
+  max-width: 100%;
+}
+
+.merge-success-content .page-info {
+  color: #909399;
+  font-size: 14px;
 }
 </style>
