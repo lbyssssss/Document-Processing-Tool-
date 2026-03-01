@@ -74,7 +74,8 @@
                       :key="index"
                       class="page-item"
                       :class="{ selected: isPageSelected(doc.id, index) }"
-                      @click="togglePageSelection(doc.id, index)"
+                      @click.ctrl.exact="togglePageSelection(doc.id, index)"
+                      @click.exact="openPreview(doc.id, index)"
                     >
                       <img :src="page.thumbnail" :alt="`第${index + 1}页`" />
                       <span class="page-number">{{ index + 1 }}</span>
@@ -146,6 +147,27 @@
           </el-col>
         </el-row>
 
+        <!-- 页面预览对话框 -->
+        <el-dialog v-model="showPreviewDialog" title="页面预览" width="800px" class="preview-dialog">
+          <div v-if="previewPage" class="preview-content">
+            <img :src="previewPage.thumbnail" :alt="`第${previewPage.pageIndex + 1}页`" class="preview-image" />
+            <div class="preview-info">
+              <p><strong>文档：</strong>{{ previewPage.docName }}</p>
+              <p><strong>页码：</strong>第 {{ previewPage.pageIndex + 1 }} 页</p>
+              <p><strong>尺寸：</strong>{{ previewPage.width }} × {{ previewPage.height }} px</p>
+            </div>
+          </div>
+          <template #footer>
+            <el-button @click="showPreviewDialog = false">关闭</el-button>
+            <el-button v-if="previewPage && !isPageSelected(previewPage.docId, previewPage.pageIndex)" type="primary" @click="selectPreviewedPage">
+              选择此页面
+            </el-button>
+            <el-button v-else-if="previewPage" type="warning" @click="deselectPreviewedPage">
+              取消选择
+            </el-button>
+          </template>
+        </el-dialog>
+
         <!-- 合并成功提示 -->
         <el-dialog v-model="showMergeSuccessDialog" title="合并成功" width="400px">
           <div class="merge-success-content">
@@ -190,6 +212,10 @@ const uploading = ref(false)
 // 合并成功相关
 const showMergeSuccessDialog = ref(false)
 const mergedFileInfo = ref<{ filename: string; totalPages: number } | null>(null)
+
+// 页面预览相关
+const showPreviewDialog = ref(false)
+const previewPage = ref<{ docId: string; docName: string; pageIndex: number; thumbnail: string; width: number; height: number } | null>(null)
 
 // 模拟文档数据
 const documents = ref<any[]>([])
@@ -414,6 +440,36 @@ function generatePlaceholderThumbnail(width: number, height: number): string {
 
   return btoa(svg)
 }
+
+// 预览相关方法
+function openPreview(docId: string, pageIndex: number) {
+  const doc = documents.value.find(d => d.id === docId)
+  if (!doc || !doc.pages[pageIndex]) return
+
+  previewPage.value = {
+    docId,
+    docName: doc.name,
+    pageIndex,
+    thumbnail: doc.pages[pageIndex].thumbnail,
+    width: doc.pages[pageIndex].width || 0,
+    height: doc.pages[pageIndex].height || 0,
+  }
+  showPreviewDialog.value = true
+}
+
+async function selectPreviewedPage() {
+  if (!previewPage.value) return
+  await togglePageSelection(previewPage.value.docId, previewPage.value.pageIndex)
+  showPreviewDialog.value = false
+}
+
+async function deselectPreviewedPage() {
+  if (!previewPage.value) return
+  const pageId = `${previewPage.value.docId}_${previewPage.value.pageIndex}`
+  await api.deselectPage(pageId)
+  mergeStore.removePage(pageId)
+  showPreviewDialog.value = false
+}
 </script>
 
 <style scoped>
@@ -554,5 +610,54 @@ function generatePlaceholderThumbnail(width: number, height: number): string {
 .merge-success-content .page-info {
   color: #909399;
   font-size: 14px;
+}
+
+/* 预览对话框样式 */
+.preview-dialog :deep(.el-dialog__body) {
+  padding: 20px;
+}
+
+.preview-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 500px;
+  object-fit: contain;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.preview-info {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.preview-info p {
+  margin: 6px 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+/* 页面网格项悬停效果 */
+.page-item:hover::after {
+  content: '点击预览';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
 }
 </style>
