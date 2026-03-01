@@ -100,6 +100,13 @@ export const api = {
     return res.data
   },
 
+  async imagesToPpt(files: File[], options?: any) {
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+    const res = await apiClient.post('/conversion/images-to-ppt', formData)
+    return res.data
+  },
+
   // 搜索
   async search(documentId: string, query: string, options?: any) {
     const res = await apiClient.get(`/search/${documentId}`, {
