@@ -424,30 +424,36 @@ class MergeService:
             from app.services.converters.pdf_merge import DocumentMergeConverter
 
             pdf_path = Path(doc_info["path"])
-            reader = PdfReader(str(pdf_path))
 
-            # 获取页面信息和缩略图
+            # 获取页面信息
             converter = DocumentMergeConverter(Path(settings.thumbnail_dir))
-            page_info = converter.get_pdf_page_info(pdf_path)
+            page_info_result = converter.get_pdf_page_info(pdf_path)
 
-            if not page_info.get("success"):
+            if not page_info_result.get("success"):
                 return {
                     "success": False,
-                    "error": page_info.get("error"),
+                    "error": page_info_result.get("error"),
                 }
 
-            pages_data = []
-            for i, info in enumerate(page_info["pages"]):
-                # 提取页面缩略图
-                thumbnails_result = converter.extract_page_thumbnails(
-                    pdf_path,
-                    pages=[i],
-                    size=(300, 420),  # 更大的预览尺寸
-                )
+            # 一次性获取所有页面的缩略图
+            thumbnails_result = converter.extract_page_thumbnails(
+                pdf_path,
+                pages=None,  # 获取所有页面
+                size=(300, 420),  # 预览尺寸
+            )
 
-                if thumbnails_result.get("success"):
-                    # 将bytes转换为base64字符串，并添加data URI前缀
-                    thumbnail_bytes = thumbnails_result["thumbnails"][0]["thumbnail"]
+            if not thumbnails_result.get("success"):
+                return {
+                    "success": False,
+                    "error": thumbnails_result.get("error"),
+                }
+
+            # 构建 pages_data，使用预先生成的缩略图
+            pages_data = []
+            for i, info in enumerate(page_info_result["pages"]):
+                # 从thumbnails_result中获取对应页面的缩略图
+                if i < len(thumbnails_result["thumbnails"]):
+                    thumbnail_bytes = thumbnails_result["thumbnails"][i]["thumbnail"]
                     import base64
                     thumbnail_base64 = f"data:image/png;base64,{base64.b64encode(thumbnail_bytes).decode('utf-8')}"
                 else:
@@ -465,7 +471,7 @@ class MergeService:
                 "success": True,
                 "document_id": document_id,
                 "document_name": doc_info["name"],
-                "total_pages": page_info["total_pages"],
+                "total_pages": page_info_result["total_pages"],
                 "pages": pages_data,
             }
 
