@@ -59,14 +59,23 @@
                 >
                   <div class="tab-header">
                     <span class="tab-title">{{ doc.name }}</span>
-                    <el-button
-                      size="small"
-                      type="danger"
-                      @click="deleteDocument(doc.id)"
-                    >
-                      <el-icon><Delete /></el-icon>
-                      删除
-                    </el-button>
+                    <div class="tab-actions">
+                      <el-button
+                        size="small"
+                        @click="selectAllPages(doc.id)"
+                        :loading="selectingAll[doc.id]"
+                      >
+                        全选
+                      </el-button>
+                      <el-button
+                        size="small"
+                        type="danger"
+                        @click="deleteDocument(doc.id)"
+                      >
+                        <el-icon><Delete /></el-icon>
+                        删除
+                      </el-button>
+                    </div>
                   </div>
                   <div class="page-grid">
                     <div
@@ -221,6 +230,14 @@ const previewPage = ref<{ docId: string; docName: string; pageIndex: number; thu
 const documents = ref<any[]>([])
 const tempUploadFiles = ref<File[]>([])
 
+// 全选状态管理
+const selectingAll = ref<Record<string, boolean>>({})
+const isAllSelected = (docId: string) => {
+  const doc = documents.value.find(d => d.id === docId)
+  if (!doc) return false
+  return doc.pages.every((page: any, index: number) => isPageSelected(docId, page.index - 1))
+}
+
 function isPageSelected(docId: string, pageIndex: number): boolean {
   return queue.value.some(
     p => p.document_id === docId && p.page_index === pageIndex
@@ -249,6 +266,52 @@ async function togglePageSelection(docId: string, pageIndex: number) {
     }
     await api.selectPage(selectedPage)
     mergeStore.addPage(selectedPage)
+  }
+}
+
+async function selectAllPages(docId: string) {
+  const doc = documents.value.find(d => d.id === docId)
+  if (!doc) return
+
+  selectingAll.value[docId] = true
+  try {
+    if (isAllSelected(docId)) {
+      // 如果已全选，则取消全选
+      for (let i = 0; i < doc.pages.length; i++) {
+        const pageIndex = doc.pages[i].index - 1
+        if (isPageSelected(docId, pageIndex)) {
+          const pageId = `${docId}_${pageIndex}`
+          await api.deselectPage(pageId)
+          mergeStore.removePage(pageId)
+        }
+      }
+      ElMessage.success('已取消全选')
+    } else {
+      // 全选所有页面
+      for (let i = 0; i < doc.pages.length; i++) {
+        const pageIndex = doc.pages[i].index - 1
+        if (!isPageSelected(docId, pageIndex)) {
+          const pageId = `${docId}_${pageIndex}`
+          const selectedPage: SelectedPage = {
+            id: pageId,
+            document_id: docId,
+            page_index: pageIndex,
+            original_document_name: doc.name,
+            thumbnail: doc.pages[i].thumbnail,
+            page_width: doc.pages[i].width,
+            page_height: doc.pages[i].height,
+            rotation: doc.pages[i].rotation,
+          }
+          await api.selectPage(selectedPage)
+          mergeStore.addPage(selectedPage)
+        }
+      }
+      ElMessage.success(`已全选 ${doc.pages.length} 页`)
+    }
+  } catch (error: any) {
+    ElMessage.error(`全选失败: ${error.message}`)
+  } finally {
+    selectingAll.value[docId] = false
   }
 }
 
@@ -496,6 +559,11 @@ async function deselectPreviewedPage() {
   flex: 1;
   font-size: 14px;
   font-weight: 500;
+}
+
+.tab-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .el-main {
