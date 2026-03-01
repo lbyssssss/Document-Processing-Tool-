@@ -16,6 +16,7 @@ from app.services.converters import (
     PPTToPDFConverter,
     PDFToImagesConverter,
     ImagesToPDFConverter,
+    ImagesToPPTConverter,
 )
 
 
@@ -329,6 +330,37 @@ class ConversionService:
             return [
                 ConversionResult(success=False, error=str(e))
             ]
+
+    async def images_to_ppt(
+        self, files: List[Path], options: ConversionOptions
+    ) -> ConversionResult:
+        """图片转PPT"""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_path = self.output_dir / f"images_{timestamp}.pptx"
+
+            converter = ImagesToPPTConverter(files, output_path)
+            result = converter.convert()
+
+            if not result.get("success"):
+                return ConversionResult(
+                    success=False,
+                    output_format="pptx",
+                    error=result.get("error", "Unknown error"),
+                )
+
+            return ConversionResult(
+                success=True,
+                output_path=str(output_path),
+                output_format="pptx",
+            )
+
+        except Exception as e:
+            return ConversionResult(
+                success=False,
+                output_format="pptx",
+                error=str(e),
+            )
 
     async def get_document_info(self, file: Path) -> dict:
         """获取文档信息（用于预览）"""

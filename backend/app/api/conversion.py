@@ -292,6 +292,36 @@ async def images_to_pdf(
         )
 
 
+@router.post("/conversion/images-to-ppt", response_model=ConversionResultPydantic)
+async def images_to_ppt(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] = File(...),
+    options: Optional[ConversionOptionsPydantic] = None,
+):
+    """图片转PPT"""
+    try:
+        saved_files = []
+        for file in files:
+            file_path = await _save_upload_file(file)
+            saved_files.append(file_path)
+
+        service_options = ConversionOptions(
+            preserve_formatting=options.preserve_formatting if options else True,
+            quality=options.quality if options else None,
+        )
+
+        result = await conversion_service.images_to_ppt(saved_files, service_options)
+
+        return _convert_service_result(result)
+
+    except Exception as e:
+        return ConversionResultPydantic(
+            success=False,
+            output_format="pptx",
+            error=str(e),
+        )
+
+
 @router.get("/conversion/document-info/{filename:path}")
 async def get_document_info(filename: str):
     """获取文档信息（用于预览）"""
