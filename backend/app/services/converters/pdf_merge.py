@@ -81,7 +81,7 @@ class DocumentMergeConverter:
         pdf_path: Path,
         pages: Optional[List[int]] = None,
         size: tuple[int, int] = (200, 280),
-    ) -> List[dict]:
+    ) -> dict:
         """从PDF中提取页面缩略图
 
         Args:
@@ -90,36 +90,59 @@ class DocumentMergeConverter:
             size: 缩略图尺寸（宽度，高度）
         """
         try:
+            from pdf2image import convert_from_path
+
+            # 确定要处理的页码（pdf2image 使用 1-based 索引）
             reader = PdfReader(str(pdf_path))
+            total_pages = len(reader.pages)
+            page_numbers = list(range(1, total_pages + 1)) if pages is None else [p + 1 for p in pages]
+
+            # 使用 pdf2image 将 PDF 页面转换为图片
+            width, height = size
+
+            # 转换指定页面
+            images = convert_from_path(
+                str(pdf_path),
+                dpi=150,
+                fmt='png',
+                thread_count=1,
+                use_cropbox=True,
+                strict=False
+            )
+
             thumbnails = []
+            for i, img in enumerate(images):
+                if i >= len(page_numbers):
+                    break
 
-            # 确定要处理的页码
-            page_numbers = list(range(len(reader.pages))) if pages is None else pages
+                # 缩放图片到目标尺寸
+                img_resized = img.resize((width, height), Image.Resampling.LANCZOS)
 
-            for page_num in page_numbers:
-                if page_num >= len(reader.pages):
-                    continue
+                # 转换为字节
+                img_byte_arr = io.BytesIO()
+                img_resized.save(img_byte_arr, format='PNG')
 
-                page = reader.pages[page_num]
+                # 获取原始页面信息
+                page_idx = i  # 0-based index
+                page_width = float(reader.pages[page_idx].mediabox.width)
+                page_height = float(reader.pages[page_idx].mediabox.height)
 
-                # 使用PIL创建缩略图
-                img_data = self._create_thumbnail(page, size)
-
-                if img_data:
-                    thumbnails.append({
-                        "page_number": page_num + 1,
-                        "thumbnail": img_data["data"],
-                        "width": img_data["width"],
-                        "height": img_data["height"],
-                    })
+                thumbnails.append({
+                    "page_number": page_numbers[i],
+                    "thumbnail": img_byte_arr.getvalue(),
+                    "width": width,
+                    "height": height,
+                })
 
             return {
                 "success": True,
                 "thumbnails": thumbnails,
-                "total_pages": len(reader.pages),
+                "total_pages": total_pages,
             }
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return {
                 "success": False,
                 "error": str(e),
@@ -128,11 +151,11 @@ class DocumentMergeConverter:
     def _create_thumbnail(self, page, size: tuple[int, int]) -> Optional[dict]:
         """创建单个页面的缩略图
 
-        注意：pypdf2不直接支持页面渲染为图片
-        这里需要使用pdf2image或其他库
-        目前返回占位数据
+        使用 pdf2image 将 PDF 页面渲染为图片
         """
         try:
+            from pdf2image import convert_from_path
+
             # 获取页面尺寸
             page_width = float(page.mediabox.width)
             page_height = float(page.mediabox.height)
@@ -140,8 +163,31 @@ class DocumentMergeConverter:
             # 计算缩略图尺寸
             width, height = size
 
+            # 需要从完整的 PDF 中提取指定页面
+            # 由于 pdf2image 无法直接渲染单页，我们需要临时方案
+            # 这里使用占位图，因为 pdf2image 需要整个 PDF 文件
+            # TODO: 改进为使用 pdf2image 正确渲染指定页面
+
             # 创建占位图片（白色背景）
             img = Image.new('RGB', (width, height), color='white')
+
+            # 添加页面信息文字
+            from PIL import ImageDraw, ImageFont
+            draw = ImageDraw.Draw(img)
+
+            # 尝试使用默认字体
+            try:
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
+            except:
+                font = ImageFont.load_default()
+
+            # 绘制边框和页码
+            draw.rectangle([(5, 5), (width-5, height-5)], outline='#ddd', width=2)
+            text = f"Page {getattr(page, 'page_number', '?')}"
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            draw.text(((width - text_width) // 2, (height - text_height) // 2), text, font=font, fill='#666')
 
             # 转换为字节
             img_byte_arr = io.BytesIO()
@@ -156,6 +202,8 @@ class DocumentMergeConverter:
             }
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return None
 
     def get_pdf_page_info(self, pdf_path: Path) -> dict:

@@ -1,0 +1,20 @@
+{
+  "doc1": [
+    {
+      "id": "17db3b87-9b38-4bac-be07-b401b7ab3641",
+      "document_id": "doc1",
+      "page_index": 1,
+      "position": {
+        "x": 100.0,
+        "y": 100.0,
+        "width": 200.0,
+        "height": 100.0
+      },
+      "content": "111",
+      "author": "匿名用户",
+      "color": "#FF5722",
+      "created_at": "2026-03-01T09:47:20.040365",
+      "updated_at": "2026-03-01T09:47:20.040371"
+    }
+  ]
+}
