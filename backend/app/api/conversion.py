@@ -1,14 +1,16 @@
 # Conversion API
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Optional
 from pathlib import Path
 import shutil
+import logging
 
 from app.core.config import settings
 from app.services.conversion_service import ConversionService, ConversionOptions, ConversionResult
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # 初始化转换服务
 conversion_service = ConversionService(
@@ -296,25 +298,33 @@ async def images_to_pdf(
 async def images_to_ppt(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
-    options: Optional[ConversionOptionsPydantic] = None,
+    preserve_formatting: bool = Form(True),
+    quality: Optional[int] = Form(None),
 ):
     """图片转PPT"""
     try:
+        logger.info(f"收到图片转PPT请求，文件数量: {len(files)}")
         saved_files = []
         for file in files:
+            logger.info(f"处理文件: {file.filename}, content_type: {file.content_type}")
             file_path = await _save_upload_file(file)
             saved_files.append(file_path)
+            logger.info(f"文件已保存到: {file_path}")
+
+        logger.info(f"所有文件已保存，开始转换，文件路径: {saved_files}")
 
         service_options = ConversionOptions(
-            preserve_formatting=options.preserve_formatting if options else True,
-            quality=options.quality if options else None,
+            preserve_formatting=preserve_formatting,
+            quality=quality,
         )
 
         result = await conversion_service.images_to_ppt(saved_files, service_options)
+        logger.info(f"转换结果: {result}")
 
         return _convert_service_result(result)
 
     except Exception as e:
+        logger.error(f"图片转PPT失败: {str(e)}", exc_info=True)
         return ConversionResultPydantic(
             success=False,
             output_format="pptx",

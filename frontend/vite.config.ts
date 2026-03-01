@@ -17,10 +17,13 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
-        timeout: 120000,
+        timeout: 300000,
         configure: (proxy, _options) => {
           proxy.on('proxyReq', (proxyReq, req, _res) => {
             console.log(`Proxying: ${req.method} ${req.url} -> http://localhost:3001${req.url}`)
+          })
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log(`Proxy response: ${req.method} ${req.url} -> Status: ${proxyRes.statusCode}`)
           })
           proxy.on('error', (err, _req, _res) => {
             console.log('Proxy error:', err)

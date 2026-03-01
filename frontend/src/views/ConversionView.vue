@@ -90,12 +90,11 @@ function handleFileChange(file: UploadFile) {
     selectedFiles.value = [file.raw]
     // 根据文件类型更新目标格式
     const ext = file.name.split('.').pop()?.toLowerCase()
-    if (targetFormat.value === 'image') {
-      // 图片上传模式，保持目标格式为image
-      if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'].includes(`.${ext}`)) {
-        // 已是图片，不需要改变
-      }
-    } else {
+    // 判断是否是图片文件
+    if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'].includes(`.${ext}`)) {
+      // 上传的是图片，设置目标格式为image
+      targetFormat.value = 'image'
+    } else if (targetFormat.value !== 'image') {
       // 文档上传模式，根据文件扩展名设置默认目标格式
       if (ext === 'pdf') {
         targetFormat.value = 'word'
