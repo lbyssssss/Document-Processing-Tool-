@@ -50,16 +50,9 @@ class DocumentMergeConverter:
                 page = reader.pages[page_idx]
 
                 # 处理页面尺寸和方向
-                if orientation == "keep-original":
-                    merged_page = page
-                elif orientation == "portrait":
-                    # rotate()返回字典，需要从中提取PageObject
-                    rotated = page.rotate(0)
-                    merged_page = rotated["/Type"]
-                elif orientation == "landscape":
-                    # rotate()返回字典，需要从中提取PageObject
-                    rotated = page.rotate(90)
-                    merged_page = rotated["/Type"]
+                merged_page = page
+                # 注意：PyPDF2 3.0+ 中，rotate() 返回 PageObject
+                # 旋转由前端通过 rotation 属性控制，这里保持原样
 
                 # 如果需要统一页面尺寸，需要添加到标准尺寸的页面
                 if page_size != "auto":
@@ -265,6 +258,7 @@ class DocumentMergeConverter:
             page = reader.pages[page_number - 1]
 
             writer = PdfWriter()
+            # PyPDF2 3.0+ 中 rotate() 返回 PageObject
             rotated_page = page.rotate(rotation)
             writer.add_page(rotated_page)
             writer.write(str(output_path))
