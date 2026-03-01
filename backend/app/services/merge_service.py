@@ -282,6 +282,30 @@ class MergeService:
         self._queue = []
         return {"status": "cleared"}
 
+    def delete_document(self, document_id: str) -> dict:
+        """删除文档及其相关数据"""
+        doc_info = self._documents.get(document_id)
+        if not doc_info:
+            return {"success": False, "error": "文档不存在"}
+
+        # 删除物理文件
+        from pathlib import Path
+        import os
+        file_path = Path(doc_info["path"])
+        if file_path.exists():
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                return {"success": False, "error": f"删除文件失败: {str(e)}"}
+
+        # 从文档列表中移除
+        del self._documents[document_id]
+
+        # 从队列中移除该文档的所有页面
+        self._queue = [p for p in self._queue if p.document_id != document_id]
+
+        return {"success": True, "document_id": document_id}
+
     def get_queue(self) -> List[SelectedPage]:
         """获取当前拼接队列"""
         return self._queue

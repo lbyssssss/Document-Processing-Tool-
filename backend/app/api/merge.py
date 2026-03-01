@@ -327,3 +327,17 @@ async def download_merged_file(filename: str):
         filename=filename,
         media_type="application/pdf",
     )
+
+
+@router.delete("/merge/documents/{document_id}")
+async def delete_document(document_id: str):
+    """删除上传的文档"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    result = merge_service.delete_document(document_id)
+    if not result.get("success"):
+        raise HTTPException(status_code=404, detail=result.get("error", "删除失败"))
+
+    logger.info(f"Deleted document: {document_id}")
+    return result

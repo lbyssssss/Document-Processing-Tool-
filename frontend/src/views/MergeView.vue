@@ -57,6 +57,17 @@
                   :label="doc.name"
                   :name="doc.id"
                 >
+                  <div class="tab-header">
+                    <span class="tab-title">{{ doc.name }}</span>
+                    <el-button
+                      size="small"
+                      type="danger"
+                      @click="deleteDocument(doc.id)"
+                    >
+                      <el-icon><Delete /></el-icon>
+                      删除
+                    </el-button>
+                  </div>
                   <div class="page-grid">
                     <div
                       v-for="(page, index) in doc.pages"
@@ -160,7 +171,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Plus, Delete, CircleCheckFilled, UploadFilled, Download, SuccessFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useMergeStore } from '@/stores/merge'
 import { api } from '@/services/api'
 import type { SelectedPage } from '@/stores/merge'
@@ -268,6 +279,34 @@ async function handleDownload() {
   }
 }
 
+async function deleteDocument(documentId: string) {
+  try {
+    await ElMessageBox.confirm('确定要删除此文档吗？删除后该文档的所有页面将从队列中移除。', '确认删除', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+
+    const result = await api.deleteDocument(documentId)
+    if (result.success) {
+      documents.value = documents.value.filter(d => d.id !== documentId)
+      mergeStore.clearQueue()
+
+      if (activeDocumentId.value === documentId) {
+        activeDocumentId.value = documents.value.length > 0 ? documents.value[0].id : ''
+      }
+
+      ElMessage.success('文档删除成功')
+    } else {
+      ElMessage.error(`删除失败: ${result.error}`)
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(`删除失败: ${error.message}`)
+    }
+  }
+}
+
 async function handleFileUpload(file: UploadFile) {
   if (file.raw) {
     tempUploadFiles.value.push(file.raw)
@@ -321,6 +360,9 @@ async function confirmUpload() {
       } else {
         ElMessage.success(`成功上传 ${uploadedDocs.length} 个文档`)
       }
+
+      // 清空队列，因为上传了新文档
+      mergeStore.clearQueue()
 
       // 为每个成功上传的文档获取页面信息
       for (const docResult of uploadedDocs) {
@@ -384,6 +426,20 @@ function generatePlaceholderThumbnail(width: number, height: number): string {
   align-items: center;
   gap: 16px;
   border-bottom: 1px solid #eee;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.tab-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .el-main {

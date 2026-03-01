@@ -286,5 +286,10 @@ export const api = {
     const res = await apiClient.get(`/merge/documents/${documentId}/pages`)
     return res.data
   },
+
+  async deleteDocument(documentId: string) {
+    const res = await apiClient.delete(`/merge/documents/${documentId}`)
+    return res.data
+  },
 }
 
