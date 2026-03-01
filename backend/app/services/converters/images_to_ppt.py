@@ -14,14 +14,6 @@ class ImagesToPPTConverter:
         self.images = images
         self.output_path = output_path
         self.ocr_mode = ocr_mode
-        self.ocr_engine = None
-
-        if self.ocr_mode:
-            try:
-                from paddleocr import PaddleOCR
-                self.ocr_engine = PaddleOCR(use_angle_cls=True, lang='ch', show_log=False)
-            except ImportError:
-                raise ImportError("PaddleOCR未安装，请运行: pip install paddleocr paddlepaddle")
 
     def convert(self) -> dict:
         """将多张图片转换为PPT文档"""
@@ -74,7 +66,7 @@ class ImagesToPPTConverter:
             img_width, img_height = img.size
 
             # 如果是OCR模式，提取文字并添加到PPT
-            if self.ocr_mode and self.ocr_engine:
+            if self.ocr_mode:
                 return self._add_ocr_text_to_ppt(prs, image_path, img_width, img_height, index)
             else:
                 return self._add_image_to_slide(prs, image_path, img_width, img_height, index)
@@ -88,102 +80,121 @@ class ImagesToPPTConverter:
     def _add_ocr_text_to_ppt(self, prs, image_path: Path, img_width: int, img_height: int, index: int) -> dict:
         """OCR模式：识别图片中的文字并添加到PPT"""
         try:
-            # 执行OCR识别
-            ocr_result = self.ocr_engine.ocr(str(image_path), cls=True)
+            from pytesseract import image_to_string, image_to_data
+            from pytesseract import Output
 
             # 添加空白幻灯片
             blank_slide_layout = prs.slide_layouts[6]
             slide = prs.slides.add_slide(blank_slide_layout)
+
+            # 使用 Tesseract OCR 识别文字
+            # 获取识别结果包括位置信息
+            ocr_data = image_to_data(str(image_path), lang='chi_sim+eng', output_type=Output.DICT)
 
             # 获取幻灯片尺寸
             slide_width = prs.slide_width
             slide_height = prs.slide_height
 
             # 如果识别到文字，添加文本框
-            if ocr_result and ocr_result[0]:
-                # 收集所有文本块
-                text_lines = []
-
-                for result in ocr_result[0]:
-                    if result:
-                        box = result[0]
-                        text = result[1][0] if result[1] else ""
-
+            if ocr_data and 'text' in ocr_data:
+                text_list = ocr_data['text']
+                if text_list:
+                    # 按垂直位置排序文本块
+                    text_lines = []
+                    for i, text in enumerate(text_list):
                         if text.strip():
-                            # 计算文本框位置和大小
-                            x1, y1 = min(box[0][0], box[3][0]), min(box[0][1], box[1][1])
-                            x2, y2 = max(box[1][0], box[2][0]), max(box[2][1], box[3][1])
+                            # 获取文本块位置（如果有）
+                            left = ocr_data['left'][i] if 'left' in ocr_data else 0
+                            top = ocr_data['top'][i] if 'top' in ocr_data else 0
+                            width = ocr_data['width'][i] if 'width' in ocr_data else slide_width - left
+                            height = ocr_data['height'][i] if 'height' in ocr_data else 50
 
                             # 将图片坐标映射到PPT幻灯片坐标
-                            left = (x1 / img_width) * slide_width
-                            top = (y1 / img_height) * slide_height
-                            width = ((x2 - x1) / img_width) * slide_width
-                            height = ((y2 - y1) / img_height) * slide_height
+                            ppt_left = (left / img_width) * slide_width
+                            ppt_top = (top / img_height) * slide_height
+                            ppt_width = (width / img_width) * slide_width
+                            ppt_height = max(Pt(24), (height / img_height) * slide_height)
 
-                            # 设置最小字体大小和文本框大小
-                            width = max(width, Inches(1))
-                            height = max(height, Pt(16))
+                            # 设置最小文本框大小
+                            ppt_width = max(ppt_width, Inches(2))
+                            ppt_height = max(ppt_height, Pt(24))
 
                             text_lines.append({
-                                "text": text,
-                                "left": left,
-                                "top": top,
-                                "width": width,
-                                "height": height,
+                                "text": text.strip(),
+                                "left": ppt_left,
+                                "top": ppt_top,
+                                "width": ppt_width,
+                                "height": ppt_height,
+                                "original_top": top,
                             })
 
-                # 按top位置排序文本块（从上到下）
-                text_lines.sort(key=lambda x: x["top"])
+                    # 按top位置排序文本块（从上到下）
+                    text_lines.sort(key=lambda x: x["original_top"])
 
-                # 添加文本框到幻灯片
-                for text_line in text_lines:
-                    text_box = slide.shapes.add_textbox(
-                        left=text_line["left"],
-                        top=text_line["top"],
-                        width=text_line["width"],
-                        height=text_line["height"]
-                    )
+                    # 添加文本框到幻灯片
+                    current_top = Inches(0.5)
+                    for text_line in text_lines:
+                        text_box = slide.shapes.add_textbox(
+                            left=text_line["left"],
+                            top=current_top,
+                            width=text_line["width"],
+                            height=text_line["height"]
+                        )
 
-                    text_frame = text_box.text_frame
-                    text_frame.word_wrap = True
+                        text_frame = text_box.text_frame
+                        text_frame.word_wrap = True
 
-                    # 根据文本框大小动态调整字体大小
-                    estimated_font_size = int(text_line["height"] / 1500000)  # 转换为磅
-                    font_size = max(Pt(10), min(Pt(estimated_font_size), Pt(48)))
+                        # 根据文本长度动态调整字体大小
+                        text_length = len(text_line["text"])
+                        if text_length < 10:
+                            font_size = Pt(24)
+                        elif text_length < 30:
+                            font_size = Pt(20)
+                        else:
+                            font_size = Pt(16)
 
-                    p = text_frame.paragraphs[0]
-                    p.text = text_line["text"]
-                    p.font.size = font_size
-                    p.font.name = "微软雅黑"
+                        font_size = max(Pt(12), min(font_size, Pt(40)))
 
-                return {
-                    "success": True,
-                    "image_name": image_path.name,
-                    "mode": "OCR",
-                    "text_lines": len(text_lines),
-                }
-            else:
-                # 未识别到文字，添加占位文本
-                text_box = slide.shapes.add_textbox(
-                    left=Inches(1),
-                    top=Inches(2),
-                    width=Inches(8),
-                    height=Inches(4)
-                )
-                text_frame = text_box.text_frame
-                text_frame.word_wrap = True
-                p = text_frame.paragraphs[0]
-                p.text = f"未识别到文字内容\n\n图片: {image_path.name}"
-                p.font.size = Pt(14)
-                p.font.name = "微软雅黑"
+                        p = text_frame.paragraphs[0]
+                        p.text = text_line["text"]
+                        p.font.size = font_size
+                        p.font.name = "微软雅黑"
 
-                return {
-                    "success": True,
-                    "image_name": image_path.name,
-                    "mode": "OCR",
-                    "text_lines": 0,
-                }
+                        current_top += Pt(36)
 
+                    return {
+                        "success": True,
+                        "image_name": image_path.name,
+                        "mode": "OCR",
+                        "text_lines": len(text_lines),
+                    }
+
+            # 未识别到文字，添加占位文本
+            text_box = slide.shapes.add_textbox(
+                left=Inches(1),
+                top=Inches(2),
+                width=Inches(8),
+                height=Inches(4)
+            )
+            text_frame = text_box.text_frame
+            text_frame.word_wrap = True
+            p = text_frame.paragraphs[0]
+            p.text = f"未识别到文字内容\n\n图片: {image_path.name}"
+            p.font.size = Pt(14)
+            p.font.name = "微软雅黑"
+
+            return {
+                "success": True,
+                "image_name": image_path.name,
+                "mode": "OCR",
+                "text_lines": 0,
+            }
+
+        except ImportError:
+            return {
+                "success": False,
+                "error": "OCR模块未安装，请运行: apt-get install tesseract-ocr && pip install pytesseract",
+            }
         except Exception as e:
             return {
                 "success": False,
