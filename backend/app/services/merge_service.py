@@ -144,8 +144,10 @@ class MergeService:
 
                     page_id = f"{document_id}_page_{i}"
 
-                    # 生成缩略图数据（base64）
-                    thumbnail_data = thumbnails_result["thumbnails"][i]["thumbnail"]
+                    # 生成缩略图数据（base64）并添加data URI前缀
+                    thumbnail_bytes = thumbnails_result["thumbnails"][i - (start_index - 1)]["thumbnail"]
+                    import base64
+                    thumbnail_data = f"data:image/png;base64,{base64.b64encode(thumbnail_bytes).decode('utf-8')}"
 
                     selected_page = SelectedPage(
                         id=page_id,
@@ -153,8 +155,8 @@ class MergeService:
                         page_index=i,
                         original_document_name=doc_info["name"],
                         thumbnail=thumbnail_data,
-                        page_width=thumbnails_result["thumbnails"][i]["width"],
-                        page_height=thumbnails_result["thumbnails"][i]["height"],
+                        page_width=thumbnails_result["thumbnails"][i - (start_index - 1)]["width"],
+                        page_height=thumbnails_result["thumbnails"][i - (start_index - 1)]["height"],
                         rotation=0,  # 初始旋转
                     )
 
@@ -216,7 +218,10 @@ class MergeService:
 
                 for i, page in enumerate(reader.pages):
                     page_id = f"{document_id}_page_{i}"
-                    thumbnail_data = thumbnails_result["thumbnails"][i]["thumbnail"]
+                    # 生成缩略图数据（base64）并添加data URI前缀
+                    import base64
+                    thumbnail_bytes = thumbnails_result["thumbnails"][i]["thumbnail"]
+                    thumbnail_data = f"data:image/png;base64,{base64.b64encode(thumbnail_bytes).decode('utf-8')}"
 
                     selected_page = SelectedPage(
                         id=page_id,
@@ -441,10 +446,10 @@ class MergeService:
                 )
 
                 if thumbnails_result.get("success"):
-                    # 将bytes转换为base64字符串
+                    # 将bytes转换为base64字符串，并添加data URI前缀
                     thumbnail_bytes = thumbnails_result["thumbnails"][0]["thumbnail"]
                     import base64
-                    thumbnail_base64 = base64.b64encode(thumbnail_bytes).decode('utf-8')
+                    thumbnail_base64 = f"data:image/png;base64,{base64.b64encode(thumbnail_bytes).decode('utf-8')}"
                 else:
                     thumbnail_base64 = None
 
