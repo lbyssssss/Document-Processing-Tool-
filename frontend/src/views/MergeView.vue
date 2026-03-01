@@ -9,6 +9,34 @@
         <h2>文档拼接</h2>
       </el-header>
       <el-main>
+        <!-- 上传文档对话框 -->
+        <el-dialog v-model="showUploadDialog" title="上传文档" width="600px">
+          <el-upload
+            drag
+            :auto-upload="false"
+            :on-change="handleFileUpload"
+            :file-list="uploadFileList"
+            accept=".pdf"
+            :limit="1"
+          >
+            <el-icon :size="60"><UploadFilled /></el-icon>
+            <div class="el-upload__text">
+              将PDF文件拖到此处，或<em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                只支持PDF格式
+              </div>
+            </template>
+          </el-upload>
+          <template #footer>
+            <el-button @click="showUploadDialog = false">取消</el-button>
+            <el-button type="primary" @click="confirmUpload" :loading="uploading">
+              确定
+            </el-button>
+          </template>
+        </el-dialog>
+
         <el-row :gutter="20">
           <!-- 左侧：文档列表和页面选择 -->
           <el-col :span="16">
@@ -105,10 +133,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Plus, Delete, CircleCheckFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Delete, CircleCheckFilled, UploadFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useMergeStore } from '@/stores/merge'
 import { api } from '@/services/api'
 import type { SelectedPage } from '@/stores/merge'
+import type { UploadFile } from 'element-plus'
 
 const router = useRouter()
 const mergeStore = useMergeStore()
@@ -117,9 +147,12 @@ const queue = computed(() => mergeStore.queue)
 const activeDocumentId = ref('')
 const showUploadDialog = ref(false)
 const merging = ref(false)
+const uploadFileList = ref<UploadFile[]>([])
+const uploading = ref(false)
 
 // 模拟文档数据
 const documents = ref<any[]>([])
+const tempUploadFile = ref<File | null>(null)
 
 function isPageSelected(docId: string, pageIndex: number): boolean {
   return queue.value.some(
@@ -167,15 +200,81 @@ async function handleMerge() {
     const config = mergeStore.config
     const result = await api.mergeDocuments(config)
     if (result.success) {
-      alert('合并成功！')
+      ElMessage.success('合并成功！')
     } else {
-      alert(`合并失败: ${result.error}`)
+      ElMessage.error(`合并失败: ${result.error}`)
     }
   } catch (error: any) {
-    alert(`合并失败: ${error.message}`)
+    ElMessage.error(`合并失败: ${error.message}`)
   } finally {
     merging.value = false
   }
+}
+
+async function handleFileUpload(file: UploadFile) {
+  if (file.raw) {
+    tempUploadFile.value = file.raw
+    uploadFileList.value = [file]
+  }
+}
+
+async function confirmUpload() {
+  if (!tempUploadFile.value) {
+    ElMessage.warning('请先选择文件')
+    return
+  }
+
+  uploading.value = true
+  try {
+    // 上传文件到后端
+    const formData = new FormData()
+    formData.append('file', tempUploadFile.value)
+
+    const result = await api.uploadDocument(tempUploadFile.value.name)
+
+    // 获取文档页面信息
+    const pagesResult = await api.getDocumentPages(result.document_id)
+
+    if (pagesResult.success) {
+      // 生成页面缩略图数据（使用占位图）
+      const docData = {
+        id: result.document_id,
+        name: result.filename,
+        pages: pagesResult.pages.map((p: any, index: number) => ({
+          index: p.index,
+          width: p.width,
+          height: p.height,
+          rotation: p.rotation,
+          thumbnail: `data:image/svg+xml;base64,${generatePlaceholderThumbnail(p.width, p.height)}`,
+        })),
+      }
+
+      documents.value.push(docData)
+      activeDocumentId.value = result.document_id
+      showUploadDialog.value = false
+      uploadFileList.value = []
+      tempUploadFile.value = null
+      ElMessage.success('文档上传成功')
+    }
+  } catch (error: any) {
+    ElMessage.error(`上传文档失败: ${error.message}`)
+  } finally {
+    uploading.value = false
+  }
+}
+
+function generatePlaceholderThumbnail(width: number, height: number): string {
+  // 生成简单的SVG占位图
+  const aspectRatio = width / height
+  const svgWidth = 100
+  const svgHeight = Math.round(svgWidth / aspectRatio)
+
+  const svg = `<svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100%" height="100%" fill="#f0f0f0"/>
+    <text x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="12" fill="#999">Page</text>
+  </svg>`
+
+  return btoa(svg)
 }
 </script>
 

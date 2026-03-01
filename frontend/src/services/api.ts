@@ -125,6 +125,145 @@ export const api = {
     return res.data
   },
 
+  async getIndexInfo(documentId: string) {
+    const res = await apiClient.get(`/search/index/${documentId}/info`)
+    return res.data
+  },
+
+  // 批注
+  async getAnnotations(documentId?: string) {
+    const params = documentId ? { document_id: documentId } : {}
+    const res = await apiClient.get('/annotation', { params })
+    return res.data
+  },
+
+  async createAnnotation(annotation: any) {
+    const res = await apiClient.post('/annotation', annotation)
+    return res.data
+  },
+
+  async getAnnotation(annotationId: string) {
+    const res = await apiClient.get(`/annotation/${annotationId}`)
+    return res.data
+  },
+
+  async updateAnnotation(annotationId: string, annotation: any) {
+    const res = await apiClient.put(`/annotation/${annotationId}`, annotation)
+    return res.data
+  },
+
+  async deleteAnnotation(annotationId: string) {
+    const res = await apiClient.delete(`/annotation/${annotationId}`)
+    return res.data
+  },
+
+  async clearDocumentAnnotations(documentId: string) {
+    const res = await apiClient.delete(`/annotation/document/${documentId}`)
+    return res.data
+  },
+
+  async getAnnotationStats(documentId?: string) {
+    const params = documentId ? { document_id: documentId } : {}
+    const res = await apiClient.get('/annotation/stats', { params })
+    return res.data
+  },
+
+  // 页面管理
+  async getDocumentPagesInfo(documentId: string) {
+    const res = await apiClient.get(`/page/document/${documentId}/info`)
+    return res.data
+  },
+
+  async insertPage(documentId: string, request: any) {
+    const res = await apiClient.post(`/page/${documentId}/insert`, request)
+    return res.data
+  },
+
+  async deletePage(documentId: string, pageNumber: number) {
+    const res = await apiClient.delete(`/page/${documentId}/${pageNumber}`)
+    return res.data
+  },
+
+  async movePage(documentId: string, request: any) {
+    const res = await apiClient.post(`/page/${documentId}/move`, request)
+    return res.data
+  },
+
+  async rotatePage(documentId: string, pageNumber: number, request: any) {
+    const res = await apiClient.post(`/page/${documentId}/${pageNumber}/rotate`, request)
+    return res.data
+  },
+
+  async mergePages(documentId: string, request: any) {
+    const res = await apiClient.post(`/page/${documentId}/merge`, request)
+    return res.data
+  },
+
+  async splitPage(documentId: string, pageNumber: number) {
+    const res = await apiClient.post(`/page/${documentId}/${pageNumber}/split`)
+    return res.data
+  },
+
+  // 批量处理
+  async batchConvert(files: File[], options?: any) {
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+
+    const params = options ? { ...options } : {}
+
+    const res = await apiClient.post('/batch/convert', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      params,
+    })
+    return res.data
+  },
+
+  async batchImagesToPdf(files: File[], options?: any) {
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+
+    const params = options ? { ...options } : {}
+
+    const res = await apiClient.post('/batch/images-to-pdf', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      params,
+    })
+    return res.data
+  },
+
+  async getBatchStatus(taskId: string) {
+    const res = await apiClient.get(`/batch/status/${taskId}`)
+    return res.data
+  },
+
+  async getBatchResult(taskId: string) {
+    const res = await apiClient.get(`/batch/result/${taskId}`)
+    return res.data
+  },
+
+  async cancelBatchTask(taskId: string) {
+    const res = await apiClient.delete(`/batch/task/${taskId}`)
+    return res.data
+  },
+
+  async listBatchTasks() {
+    const res = await apiClient.get('/batch/tasks')
+    return res.data
+  },
+
+  async cleanupOldTasks(maxAgeHours: number = 24) {
+    const res = await apiClient.post('/batch/cleanup', {}, {
+      params: { max_age_hours: maxAgeHours.toString() },
+    })
+    return res.data
+  },
+
+  // 拼接
+  async uploadDocument(filePath: string) {
+    const res = await apiClient.post('/merge/upload-document', { file_path: filePath })
+    return res.data
+  },
+
   // 拼接
   async selectPage(page: any) {
     const res = await apiClient.post('/merge/select-page', page)
@@ -145,4 +284,15 @@ export const api = {
     const res = await apiClient.post('/merge/execute', config)
     return res.data
   },
+
+  async uploadDocument(filePath: string) {
+    const res = await apiClient.post('/merge/upload-document', { file_path: filePath })
+    return res.data
+  },
+
+  async getDocumentPages(documentId: string) {
+    const res = await apiClient.get(`/merge/documents/${documentId}/pages`)
+    return res.data
+  },
 }
+
