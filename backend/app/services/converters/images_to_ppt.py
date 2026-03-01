@@ -1,10 +1,13 @@
 # Images to PPT Conversion
 from PIL import Image
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN
+from pptx.dml.color import RGBColor
 import io
+import re
 
 
 class ImagesToPPTConverter:
@@ -78,7 +81,7 @@ class ImagesToPPTConverter:
             }
 
     def _add_ocr_text_to_ppt(self, prs, image_path: Path, img_width: int, img_height: int, index: int) -> dict:
-        """OCR模式：识别图片中的文字并添加到PPT"""
+        """OCR模式：识别图片中的文字并按格式添加到PPT"""
         try:
             from pytesseract import image_to_string, image_to_data
             from pytesseract import Output
@@ -88,85 +91,37 @@ class ImagesToPPTConverter:
             slide = prs.slides.add_slide(blank_slide_layout)
 
             # 使用 Tesseract OCR 识别文字
-            # 获取识别结果包括位置信息
             ocr_data = image_to_data(str(image_path), lang='chi_sim+eng', output_type=Output.DICT)
 
             # 获取幻灯片尺寸
             slide_width = prs.slide_width
             slide_height = prs.slide_height
 
-            # 如果识别到文字，添加文本框
+            # 解析识别到的文本，提取格式信息
             if ocr_data and 'text' in ocr_data:
                 text_list = ocr_data['text']
                 if text_list:
-                    # 按垂直位置排序文本块
-                    text_lines = []
-                    for i, text in enumerate(text_list):
-                        if text.strip():
-                            # 获取文本块位置（如果有）
-                            left = ocr_data['left'][i] if 'left' in ocr_data else 0
-                            top = ocr_data['top'][i] if 'top' in ocr_data else 0
-                            width = ocr_data['width'][i] if 'width' in ocr_data else slide_width - left
-                            height = ocr_data['height'][i] if 'height' in ocr_data else 50
+                    # 分析文本块，提取格式和内容
+                    parsed_blocks = self._analyze_text_blocks(text_list, ocr_data)
 
-                            # 将图片坐标映射到PPT幻灯片坐标
-                            ppt_left = (left / img_width) * slide_width
-                            ppt_top = (top / img_height) * slide_height
-                            ppt_width = (width / img_width) * slide_width
-                            ppt_height = max(Pt(24), (height / img_height) * slide_height)
+                    # 按原始位置排序文本块
+                    parsed_blocks.sort(key=lambda x: x["original_top"])
 
-                            # 设置最小文本框大小
-                            ppt_width = max(ppt_width, Inches(2))
-                            ppt_height = max(ppt_height, Pt(24))
-
-                            text_lines.append({
-                                "text": text.strip(),
-                                "left": ppt_left,
-                                "top": ppt_top,
-                                "width": ppt_width,
-                                "height": ppt_height,
-                                "original_top": top,
-                            })
-
-                    # 按top位置排序文本块（从上到下）
-                    text_lines.sort(key=lambda x: x["original_top"])
-
-                    # 添加文本框到幻灯片
-                    current_top = Inches(0.5)
-                    for text_line in text_lines:
-                        text_box = slide.shapes.add_textbox(
-                            left=text_line["left"],
-                            top=current_top,
-                            width=text_line["width"],
-                            height=text_line["height"]
+                    # 按格式添加到PPT
+                    for block in parsed_blocks:
+                        self._add_text_block_to_slide(
+                            slide,
+                            block,
+                            img_width,
+                            img_height,
+                            slide_width
                         )
-
-                        text_frame = text_box.text_frame
-                        text_frame.word_wrap = True
-
-                        # 根据文本长度动态调整字体大小
-                        text_length = len(text_line["text"])
-                        if text_length < 10:
-                            font_size = Pt(24)
-                        elif text_length < 30:
-                            font_size = Pt(20)
-                        else:
-                            font_size = Pt(16)
-
-                        font_size = max(Pt(12), min(font_size, Pt(40)))
-
-                        p = text_frame.paragraphs[0]
-                        p.text = text_line["text"]
-                        p.font.size = font_size
-                        p.font.name = "微软雅黑"
-
-                        current_top += Pt(36)
 
                     return {
                         "success": True,
                         "image_name": image_path.name,
                         "mode": "OCR",
-                        "text_lines": len(text_lines),
+                        "text_lines": len(parsed_blocks),
                     }
 
             # 未识别到文字，添加占位文本
@@ -200,6 +155,130 @@ class ImagesToPPTConverter:
                 "success": False,
                 "error": f"OCR识别失败: {str(e)}",
             }
+
+    def _add_text_block_to_slide(self, slide, block: dict, img_width: int, img_height: int, slide_width: int, slide_height: int):
+        """添加文本块到幻灯片"""
+        text = block["text"]
+
+        # 计算位置（映射到PPT坐标）
+        ppt_left = (block["left"] / img_width) * slide_width
+        ppt_top = (block["top"] / img_height) * slide_height
+        ppt_width = (block["width"] / img_width) * slide_width
+
+        # 根据文本类型设置字体
+        if block["type"] == "title":
+            font_size = Pt(32)
+            font_name = "微软雅黑"
+            font_bold = True
+            font_color = RGBColor(0, 51, 102)
+        elif block["type"] == "list":
+            font_size = Pt(18)
+            font_name = "微软雅黑"
+            font_bold = False
+            font_color = RGBColor(50, 50, 50)
+        elif block["type"] == "content":
+            font_size = Pt(14)
+            font_name = "微软雅黑"
+            font_bold = False
+            font_color = RGBColor(0, 0, 0)
+        else:
+            font_size = Pt(14)
+            font_name = "微软雅黑"
+            font_bold = False
+            font_color = RGBColor(0, 0, 0)
+
+        # 添加文本框
+        text_box = slide.shapes.add_textbox(
+            left=ppt_left,
+            top=ppt_top,
+            width=max(ppt_width, Inches(2)),
+            height=max(Pt(24), (block["height"] / img_height) * slide_height),
+        )
+
+        # 设置文本格式
+        text_frame = text_box.text_frame
+        text_frame.word_wrap = True
+
+        p = text_frame.paragraphs[0]
+        p.text = text
+        p.font.size = font_size
+        p.font.name = font_name
+        p.font.bold = font_bold
+        p.font.color.rgb = font_color
+        p.alignment = PP_ALIGN.LEFT
+
+    def _analyze_text_blocks(self, text_list: list, ocr_data: dict) -> list:
+        """分析文本块，提取格式信息"""
+        blocks = []
+        i = 0
+
+        while i < len(text_list):
+            text = text_list[i]
+            if not text.strip():
+                i += 1
+                continue
+
+            # 获取位置信息
+            if i < len(ocr_data.get('left', [])):
+                left = ocr_data['left'][i]
+                top = ocr_data['top'][i]
+                width = ocr_data['width'][i]
+                height = ocr_data['height'][i]
+            else:
+                left = top = width = height = 0
+
+            # 分析文本特征判断类型
+            text_type, block_content = self._classify_text_block(text, i)
+
+            if text_type == "empty":
+                i += 1
+                continue
+
+            blocks.append({
+                "text": text,
+                "type": text_type,
+                "original_top": top,
+                "left": left,
+                "top": top,
+                "width": width,
+                "height": height,
+                "content": block_content,
+            })
+
+            i += 1
+
+        return blocks
+
+    def _classify_text_block(self, text: str, index: int) -> Tuple[str, str]:
+        """分类文本块类型"""
+        text = text.strip()
+
+        # 空行
+        if not text:
+            return "empty", ""
+
+        # 判断是否是标题
+        # 1. 全大写或首字母大写
+        # 2. 短文本（通常<20字符）
+        # 3. 行首有编号或符号
+        if text.isupper():
+            return "title", text
+
+        if len(text) < 30:
+            # 检查是否是编号标题
+            if re.match(r'^[一二三四五六七八九十]+[、，\.]', text):
+                return "title", text
+            # 检查是否以符号开头
+            if re.match(r'^[•\-\*]+', text):
+                return "title", text
+
+        # 判断是否是列表项
+        # 1. 有编号或符号开头
+        if re.match(r'^[一二三四五六七八九十]+[、\.\)]+', text):
+            return "list", text
+
+        # 正常内容
+        return "content", text
 
     def _add_image_to_slide(self, prs, image_path: Path, img_width: int, img_height: int, index: int) -> dict:
         """普通模式：直接添加图片到PPT"""
