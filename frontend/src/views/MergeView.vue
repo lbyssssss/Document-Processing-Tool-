@@ -227,10 +227,7 @@ async function confirmUpload() {
   uploading.value = true
   try {
     // 上传文件到后端
-    const formData = new FormData()
-    formData.append('file', tempUploadFile.value)
-
-    const result = await api.uploadDocument(tempUploadFile.value.name)
+    const result = await api.uploadDocument(tempUploadFile.value)
 
     // 获取文档页面信息
     const pagesResult = await api.getDocumentPages(result.document_id)

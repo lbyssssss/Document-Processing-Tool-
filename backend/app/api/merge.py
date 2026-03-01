@@ -1,8 +1,9 @@
 # Merge API
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import List, Optional
 from pathlib import Path
+import shutil
 
 from app.core.config import settings
 from app.services.merge_service import (
@@ -82,29 +83,50 @@ def _to_pydantic_result(result: MergeServiceMergeResult) -> MergeResultPydantic:
 
 
 @router.post("/merge/upload-document")
-async def upload_document(file_path: str):
+async def upload_document(file: UploadFile = File(...)):
     """上传文档用于合并"""
-    # 验证文件是否存在
-    import shutil
-    from datetime import datetime
+    import uuid
+    import logging
 
-    if not Path(file_path).exists():
-        raise HTTPException(status_code=404, detail="文件不存在")
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"Received file: {file.filename}, content_type: {file.content_type}")
+
+    # 验证文件类型
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="文件名不能为空")
+
+    # 更宽容的文件名检查
+    filename_lower = file.filename.lower()
+    if not filename_lower.endswith('.pdf'):
+        logger.warning(f"File extension check failed for: {file.filename}")
+        raise HTTPException(status_code=400, detail="只支持PDF格式文件")
 
     # 生成文档ID
-    import uuid
     doc_id = str(uuid.uuid4())
 
     # 目标路径
     target_filename = f"{doc_id}.pdf"
     target_path = Path(settings.upload_dir) / target_filename
 
-    # 复制文件
-    shutil.copy2(file_path, target_path)
+    # 确保上传目录存在
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 保存上传的文件
+    with open(target_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # 注册文档信息到merge_service
+    merge_service._documents[doc_id] = {
+        "id": doc_id,
+        "name": file.filename,
+        "path": str(target_path),
+    }
 
     return {
+        "success": True,
         "document_id": doc_id,
-        "filename": Path(file_path).name,
+        "filename": file.filename,
         "status": "uploaded",
     }
 

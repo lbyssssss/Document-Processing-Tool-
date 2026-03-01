@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 const apiClient: AxiosInstance = axios.create({
   baseURL,
@@ -14,6 +14,10 @@ const apiClient: AxiosInstance = axios.create({
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
+    // 如果是 FormData，删除 Content-Type，让浏览器自动设置 boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type']
+    }
     return config
   },
   (error) => {
@@ -41,54 +45,42 @@ export const api = {
   async pdfToWord(file: File, options?: any) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await apiClient.post('/conversion/pdf-to-word', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await apiClient.post('/conversion/pdf-to-word', formData)
     return res.data
   },
 
   async wordToPdf(file: File, options?: any) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await apiClient.post('/conversion/word-to-pdf', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await apiClient.post('/conversion/word-to-pdf', formData)
     return res.data
   },
 
   async pdfToExcel(file: File, options?: any) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await apiClient.post('/conversion/pdf-to-excel', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await apiClient.post('/conversion/pdf-to-excel', formData)
     return res.data
   },
 
   async excelToPdf(file: File, options?: any) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await apiClient.post('/conversion/excel-to-pdf', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await apiClient.post('/conversion/excel-to-pdf', formData)
     return res.data
   },
 
   async pdfToPpt(file: File, options?: any) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await apiClient.post('/conversion/pdf-to-ppt', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await apiClient.post('/conversion/pdf-to-ppt', formData)
     return res.data
   },
 
   async pptToPdf(file: File, options?: any) {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await apiClient.post('/conversion/ppt-to-pdf', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await apiClient.post('/conversion/ppt-to-pdf', formData)
     return res.data
   },
 
@@ -97,18 +89,14 @@ export const api = {
     formData.append('file', file)
     if (options?.quality) formData.append('quality', options.quality.toString())
     if (options?.dpi) formData.append('dpi', options.dpi.toString())
-    const res = await apiClient.post('/conversion/pdf-to-images', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await apiClient.post('/conversion/pdf-to-images', formData)
     return res.data
   },
 
   async imagesToPdf(files: File[], options?: any) {
     const formData = new FormData()
     files.forEach(file => formData.append('files', file))
-    const res = await apiClient.post('/conversion/images-to-pdf', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await apiClient.post('/conversion/images-to-pdf', formData)
     return res.data
   },
 
@@ -211,10 +199,7 @@ export const api = {
 
     const params = options ? { ...options } : {}
 
-    const res = await apiClient.post('/batch/convert', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      params,
-    })
+    const res = await apiClient.post('/batch/convert', formData, { params })
     return res.data
   },
 
@@ -224,10 +209,7 @@ export const api = {
 
     const params = options ? { ...options } : {}
 
-    const res = await apiClient.post('/batch/images-to-pdf', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      params,
-    })
+    const res = await apiClient.post('/batch/images-to-pdf', formData, { params })
     return res.data
   },
 
@@ -259,12 +241,13 @@ export const api = {
   },
 
   // 拼接
-  async uploadDocument(filePath: string) {
-    const res = await apiClient.post('/merge/upload-document', { file_path: filePath })
+  async uploadDocument(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await apiClient.post('/merge/upload-document', formData)
     return res.data
   },
 
-  // 拼接
   async selectPage(page: any) {
     const res = await apiClient.post('/merge/select-page', page)
     return res.data
@@ -282,11 +265,6 @@ export const api = {
 
   async mergeDocuments(config: any) {
     const res = await apiClient.post('/merge/execute', config)
-    return res.data
-  },
-
-  async uploadDocument(filePath: string) {
-    const res = await apiClient.post('/merge/upload-document', { file_path: filePath })
     return res.data
   },
 

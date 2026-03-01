@@ -404,7 +404,10 @@ class MergeService:
                 )
 
                 if thumbnails_result.get("success"):
-                    thumbnail_base64 = thumbnails_result["thumbnails"][0]["thumbnail"]
+                    # 将bytes转换为base64字符串
+                    thumbnail_bytes = thumbnails_result["thumbnails"][0]["thumbnail"]
+                    import base64
+                    thumbnail_base64 = base64.b64encode(thumbnail_bytes).decode('utf-8')
                 else:
                     thumbnail_base64 = None
 
