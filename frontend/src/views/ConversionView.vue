@@ -165,12 +165,14 @@ async function handleConvert() {
     if (result.success) {
       // 提供下载链接
       if (result.output_path) {
-        // 构建下载URL
-        const downloadUrl = `/api/v1/conversion/download/${encodeURIComponent(result.output_path)}`
+        // 获取文件名（output_path包含完整路径）
+        const fileName = result.output_path.split('/').pop() || 'converted_file'
+        // 构建下载URL（只发送文件名，不带路径）
+        const downloadUrl = `/api/v1/conversion/download/${encodeURIComponent(fileName)}`
         // 创建下载链接
         const link = document.createElement('a')
         link.href = downloadUrl
-        link.download = result.output_path.split('/').pop() || 'converted_file'
+        link.download = fileName
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
