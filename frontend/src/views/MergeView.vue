@@ -238,11 +238,11 @@ async function confirmUpload() {
         id: result.document_id,
         name: result.filename,
         pages: pagesResult.pages.map((p: any, index: number) => ({
-          index: p.index,
+          index: p.page_number,
           width: p.width,
           height: p.height,
           rotation: p.rotation,
-          thumbnail: `data:image/svg+xml;base64,${generatePlaceholderThumbnail(p.width, p.height)}`,
+          thumbnail: p.thumbnail || `data:image/svg+xml;base64,${generatePlaceholderThumbnail(p.width, p.height)}`,
         })),
       }
 
