@@ -15,7 +15,7 @@ export default defineConfig({
     allowedHosts: ['.monkeycode-ai.online'],
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:3001',
         changeOrigin: true,
       },
     },
